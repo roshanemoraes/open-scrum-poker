@@ -33,6 +33,10 @@ export function getRoom(id) {
   return rooms.get(id);
 }
 
+export function deleteRoom(id) {
+  return rooms.delete(id);
+}
+
 export function roomExists(id) {
   return rooms.has(id);
 }

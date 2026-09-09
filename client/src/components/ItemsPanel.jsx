@@ -1,13 +1,15 @@
 import { useState } from 'react';
 
+const ITEM_PREFIX = 'PRB-';
+
 export default function ItemsPanel({ items, currentItemIndex, isHost, onAdd, onSelect, onRemove, onPrev, onNext }) {
-  const [newName, setNewName] = useState('');
+  const [newNumber, setNewNumber] = useState('');
 
   function handleAdd(e) {
     e.preventDefault();
-    if (!newName.trim()) return;
-    onAdd(newName.trim());
-    setNewName('');
+    if (!newNumber.trim()) return;
+    onAdd(ITEM_PREFIX + newNumber.trim());
+    setNewNumber('');
   }
 
   return (
@@ -63,12 +65,16 @@ export default function ItemsPanel({ items, currentItemIndex, isHost, onAdd, onS
 
       {isHost && (
         <form onSubmit={handleAdd} className="flex gap-2">
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Add sprint item…"
-            className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-violet-400"
-          />
+          <div className="flex-1 flex items-center border border-slate-200 rounded-lg overflow-hidden focus-within:border-violet-400">
+            <span className="pl-3 text-sm text-slate-400 select-none">{ITEM_PREFIX}</span>
+            <input
+              value={newNumber}
+              onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, ''))}
+              placeholder="1234"
+              inputMode="numeric"
+              className="flex-1 min-w-0 text-sm py-1.5 pr-3 pl-1 outline-none"
+            />
+          </div>
           <button type="submit" className="text-sm bg-violet-600 text-white rounded-lg px-3 py-1.5">
             Add
           </button>

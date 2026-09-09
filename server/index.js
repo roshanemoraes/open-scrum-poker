@@ -9,6 +9,7 @@ import { attemptHostLogin, isHostToken } from './auth.js';
 import {
   createRoom,
   getRoom,
+  deleteRoom,
   roomExists,
   addItem,
   removeItem,
@@ -178,6 +179,13 @@ io.on('connection', (socket) => {
     if (!room) return;
     setCurrentItemIndex(room, index);
     emitRoom(roomId);
+  });
+
+  socket.on('end-session', () => {
+    const room = requireHost();
+    if (!room) return;
+    io.to(roomId).emit('session-ended');
+    deleteRoom(roomId);
   });
 
   socket.on('disconnect', () => {

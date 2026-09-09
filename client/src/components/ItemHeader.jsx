@@ -1,3 +1,5 @@
+import { ExternalLinkIcon } from './Icons.jsx';
+
 const JIRA_BASE = 'https://synergenhealth.atlassian.net/browse/';
 
 export default function ItemHeader({ item, index, total, isHost, onPrev, onNext }) {
@@ -29,9 +31,9 @@ export default function ItemHeader({ item, index, total, isHost, onPrev, onNext 
           href={jiraUrl}
           target="_blank"
           rel="noreferrer"
-          className="shrink-0 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-1.5"
+          className="shrink-0 flex items-center gap-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-1.5"
         >
-          View ↗
+          <ExternalLinkIcon width={14} height={14} /> View
         </a>
       </div>
 

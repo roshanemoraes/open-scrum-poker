@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { socket } from '../lib/socket.js';
 import { exportUrl } from '../lib/api.js';
@@ -8,12 +8,14 @@ import Sidebar from '../components/Sidebar.jsx';
 import ItemsPanel from '../components/ItemsPanel.jsx';
 import ItemHeader from '../components/ItemHeader.jsx';
 import PollPanel from '../components/PollPanel.jsx';
+import { Logo, LinkIcon, ListIcon, DownloadIcon, PowerIcon } from '../components/Icons.jsx';
 
 const RCI_DECK = ['1', '2', '3', '4', '5', '?'];
 const EFFORT_DECK = ['0', '1', '2', '3', '5', '8', '13', '21', '34', '55', '89', '?'];
 
 export default function Room() {
   const { roomId } = useParams();
+  const navigate = useNavigate();
   const [needsName, setNeedsName] = useState(!getName());
   const [nameDraft, setNameDraft] = useState(getName());
   const [asObserver, setAsObserver] = useState(false);
@@ -54,6 +56,10 @@ export default function Room() {
       setStatus('error');
     });
     socket.on('room-state', (state) => setRoom(state));
+    socket.on('session-ended', () => {
+      socket.disconnect();
+      navigate('/');
+    });
 
     if (socket.connected) doJoin();
 
@@ -62,6 +68,7 @@ export default function Room() {
       socket.off('joined');
       socket.off('join-error');
       socket.off('room-state');
+      socket.off('session-ended');
       socket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,6 +91,11 @@ export default function Room() {
 
   function downloadExcel() {
     window.open(exportUrl(roomId, hostToken.current), '_blank');
+  }
+
+  function endSession() {
+    if (!window.confirm('End this session for everyone? This cannot be undone.')) return;
+    socket.emit('end-session');
   }
 
   if (needsName) {
@@ -133,26 +145,45 @@ export default function Room() {
 
   return (
     <div className="min-h-screen p-4 md:p-6">
-      <header className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-5 py-3 mb-4">
-        <div>
-          <h1 className="font-bold text-slate-800">{room.name}</h1>
-          <p className="text-xs text-slate-400">Session code: {room.id}</p>
+      <header className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-5 py-3 mb-4 gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <Logo />
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">
+              Open Scrum Poker
+            </p>
+            <h1 className="font-bold text-slate-800 truncate leading-tight">{room.name}</h1>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button onClick={copyShareLink} className="text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-2">
-            {copied ? 'Copied!' : 'Invite Others 🔗'}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={copyShareLink}
+            className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-2"
+          >
+            <LinkIcon /> {copied ? 'Copied!' : 'Invite Others'}
           </button>
           {isHost && (
             <button
               onClick={() => setManageItems((v) => !v)}
-              className="text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-2"
+              className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-2"
             >
-              {manageItems ? 'Close Item Setup' : 'Manage Items'}
+              <ListIcon /> {manageItems ? 'Close Item Setup' : 'Manage Items'}
             </button>
           )}
           {isHost && (
-            <button onClick={downloadExcel} className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-2">
-              Download Excel
+            <button
+              onClick={downloadExcel}
+              className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-2"
+            >
+              <DownloadIcon /> Download Excel
+            </button>
+          )}
+          {isHost && (
+            <button
+              onClick={endSession}
+              className="flex items-center gap-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 rounded-lg px-3 py-2"
+            >
+              <PowerIcon /> End Session
             </button>
           )}
         </div>

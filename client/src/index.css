@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* House style: flatten every non-pill corner radius to 0.25rem app-wide. */
+@theme {
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.25rem;
+  --radius-2xl: 0.25rem;
+}
+
 :root {
   color-scheme: light;
 }

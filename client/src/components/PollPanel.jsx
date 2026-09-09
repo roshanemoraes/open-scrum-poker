@@ -65,22 +65,24 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
       </div>
 
       {isHost && (
-        <div className="flex flex-wrap gap-2 justify-center border-t border-slate-100 pt-3">
-          <button
-            onClick={onReveal}
-            disabled={poll.revealed}
-            className="text-xs font-medium bg-violet-600 disabled:opacity-40 text-white rounded-lg px-3 py-1.5"
-          >
-            Reveal
-          </button>
-          <button
-            onClick={onReset}
-            className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-1.5"
-          >
-            Reset
-          </button>
+        <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
+          <div className="flex flex-wrap gap-2 justify-center">
+            <button
+              onClick={onReveal}
+              disabled={poll.revealed}
+              className="text-xs font-medium bg-violet-600 disabled:opacity-40 text-white rounded-lg px-3 py-1.5"
+            >
+              Reveal
+            </button>
+            <button
+              onClick={onReset}
+              className="text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-1.5"
+            >
+              Reset
+            </button>
+          </div>
           {poll.revealed && (
-            <div className="flex flex-wrap items-center gap-1">
+            <div className="flex flex-wrap items-center justify-center gap-1">
               {distinctValues.map((v) => (
                 <button
                   key={v}
