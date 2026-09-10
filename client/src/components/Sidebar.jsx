@@ -12,7 +12,7 @@ function StatusDot({ label, voted, revealed }) {
   );
 }
 
-export default function Sidebar({ participants, currentItem }) {
+export default function Sidebar({ participants, currentItem, selfId }) {
   const voters = participants.filter((p) => !p.isObserver);
   const observers = participants.filter((p) => p.isObserver);
 
@@ -26,6 +26,7 @@ export default function Sidebar({ participants, currentItem }) {
               <Avatar id={p.id} avatarId={p.avatarId} name={p.name} size={30} />
               <span className="text-sm text-slate-700 truncate flex-1">
                 {p.name}
+                {p.id === selfId && <span className="text-slate-400 font-normal"> (me)</span>}
                 {p.isHost && <span className="text-violet-500 text-[10px] font-semibold ml-1">HOST</span>}
               </span>
               {currentItem && (
@@ -49,6 +50,7 @@ export default function Sidebar({ participants, currentItem }) {
                 <Avatar id={p.id} avatarId={p.avatarId} name={p.name} size={30} />
                 <span className="text-sm text-slate-500 truncate">
                   {p.name}
+                  {p.id === selfId && <span className="text-slate-400 font-normal"> (me)</span>}
                   {p.isHost && <span className="text-violet-500 text-[10px] font-semibold ml-1">HOST</span>}
                 </span>
               </div>

@@ -217,7 +217,7 @@ export default function Room() {
       </header>
 
       <div className="flex flex-col lg:flex-row gap-4">
-        <Sidebar participants={room.participants} currentItem={room.currentItem} />
+        <Sidebar participants={room.participants} currentItem={room.currentItem} selfId={getParticipantId(room.id)} />
 
         <div className="flex-1 flex flex-col gap-4 min-w-0">
           {isHost && manageItems ? (

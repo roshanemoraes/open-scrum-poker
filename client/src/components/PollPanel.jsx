@@ -91,7 +91,7 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
       )}
       {!isHost && (
         <div className="bg-slate-50 rounded-[10px] p-3 text-center text-slate-400 text-sm">
-          {poll.revealed ? 'Votes revealed' : 'Waiting on host…'}
+          {poll.revealed ? 'Votes revealed' : 'Waiting on host to reveal cards…'}
         </div>
       )}
 

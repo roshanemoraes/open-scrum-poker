@@ -44,6 +44,18 @@ npm start       # serves API + built client from one process, on $PORT (default 
 - The host reveals each poll when ready, then confirms a **final value** (clicking one of the revealed values, or typing a custom one) — that's what gets exported.
 - Once finals are set for the items you care about, the host clicks **Download Excel** to get a workbook with Item / RCI / Effort columns.
 
+## Testing with simulated voters
+
+`scripts/populate.mjs` spins up a room with N simulated voters (real socket connections) against a running server, so you can check the UI at scale without opening N browser tabs:
+
+```bash
+npm run populate -- 15          # 15 simulated voters + 1 host
+npm run populate -- 40 --vote   # 40 voters, all cast RCI/Effort votes immediately
+npm run populate -- 8 --url http://10.10.46.117:3001   # target a different host/port
+```
+
+It logs in as host (using `HOST_PASSWORD`, default `changeme`), creates a room, adds two sample items (`PRB-1001`, `PRB-1002`), connects the voters, and prints join links for both the dev setup (`:5173`) and a single-process/production deployment. The sockets stay connected — and the participants stay "online" in the room — until you stop the process (Ctrl+C).
+
 ## Notes / limitations
 
 - All state (rooms, items, votes) is in memory only — a server restart or redeploy clears everything. This is intentional per the "no remote DB" requirement; if you need durability across restarts, swap `server/store.js` for a persistent store.
