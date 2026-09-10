@@ -57,7 +57,7 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
         <div className="flex flex-wrap justify-center gap-2">
           {voters.map((p) => (
             <div key={p.id} className="w-14 flex flex-col items-center gap-1">
-              <Avatar id={p.id} name={p.name} size={32} />
+              <Avatar id={p.id} avatarId={p.avatarId} name={p.name} size={32} />
               <span className="text-[10px] text-slate-500 truncate w-full text-center">{p.name}</span>
             </div>
           ))}

@@ -23,7 +23,7 @@ export function createRoom(name) {
     createdAt: Date.now(),
     items: [],
     currentItemIndex: -1,
-    participants: {}, // socketId -> { id, name, isHost, isObserver, connected }
+    participants: {}, // socketId -> { id, name, avatarId, isHost, isObserver, connected }
   };
   rooms.set(id, room);
   return room;

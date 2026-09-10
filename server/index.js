@@ -91,7 +91,7 @@ io.on('connection', (socket) => {
   let roomId = null;
   let participantId = null;
 
-  socket.on('join', ({ roomId: rid, name, participantId: pid, isObserver, hostToken }) => {
+  socket.on('join', ({ roomId: rid, name, participantId: pid, avatarId, isObserver, hostToken }) => {
     const room = getRoom(rid);
     if (!room) {
       socket.emit('join-error', { error: 'Room not found' });
@@ -106,6 +106,7 @@ io.on('connection', (socket) => {
       id: participantId,
       socketId: socket.id,
       name: (name || 'Guest').trim().slice(0, 40) || 'Guest',
+      avatarId: Number.isInteger(avatarId) ? avatarId : null,
       isHost: host,
       // The host runs the session and never votes, regardless of the observer checkbox.
       isObserver: host || !!isObserver,

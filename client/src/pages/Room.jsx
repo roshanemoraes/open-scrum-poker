@@ -3,11 +3,20 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { nanoid } from 'nanoid';
 import { socket } from '../lib/socket.js';
 import { exportUrl } from '../lib/api.js';
-import { getHostToken, getName, setName, getParticipantId, setParticipantId } from '../lib/storage.js';
+import {
+  getHostToken,
+  getName,
+  setName,
+  getParticipantId,
+  setParticipantId,
+  getAvatarId,
+  setAvatarId,
+} from '../lib/storage.js';
 import Sidebar from '../components/Sidebar.jsx';
 import ItemsPanel from '../components/ItemsPanel.jsx';
 import ItemHeader from '../components/ItemHeader.jsx';
 import PollPanel from '../components/PollPanel.jsx';
+import AvatarPicker from '../components/AvatarPicker.jsx';
 import { Logo, LinkIcon, ListIcon, DownloadIcon, PowerIcon } from '../components/Icons.jsx';
 
 const RCI_DECK = ['1', '2', '3', '4', '5', '?'];
@@ -16,8 +25,9 @@ const EFFORT_DECK = ['0', '1', '2', '3', '5', '8', '13', '21', '34', '55', '89',
 export default function Room() {
   const { roomId } = useParams();
   const navigate = useNavigate();
-  const [needsName, setNeedsName] = useState(!getName());
+  const [needsProfile, setNeedsProfile] = useState(!getName() || getAvatarId() == null);
   const [nameDraft, setNameDraft] = useState(getName());
+  const [avatarDraft, setAvatarDraft] = useState(getAvatarId());
   const [asObserver, setAsObserver] = useState(false);
 
   const [status, setStatus] = useState('idle'); // idle | connecting | in-room | error
@@ -29,7 +39,7 @@ export default function Room() {
   const hostToken = useRef(getHostToken());
 
   useEffect(() => {
-    if (needsName) return;
+    if (needsProfile) return;
     setStatus('connecting');
     socket.connect();
 
@@ -41,6 +51,7 @@ export default function Room() {
         roomId,
         name: getName(),
         participantId: pid,
+        avatarId: getAvatarId(),
         isObserver: asObserver,
         hostToken: hostToken.current,
       });
@@ -72,13 +83,14 @@ export default function Room() {
       socket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsName, roomId]);
+  }, [needsProfile, roomId]);
 
   function handleEnter(e) {
     e.preventDefault();
-    if (!nameDraft.trim()) return;
+    if (!nameDraft.trim() || avatarDraft == null) return;
     setName(nameDraft.trim());
-    setNeedsName(false);
+    setAvatarId(avatarDraft);
+    setNeedsProfile(false);
   }
 
   function copyShareLink() {
@@ -98,27 +110,41 @@ export default function Room() {
     socket.emit('end-session');
   }
 
-  if (needsName) {
+  if (needsProfile) {
+    const canContinue = !!nameDraft.trim() && avatarDraft != null;
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <form onSubmit={handleEnter} className="bg-white rounded-2xl shadow-sm p-6 w-full max-w-sm flex flex-col gap-3">
-          <h2 className="font-semibold text-lg text-slate-700">Join session</h2>
-          <input
-            autoFocus
-            value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
-            placeholder="Your name"
-            className="border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-violet-400"
-          />
+        <form onSubmit={handleEnter} className="bg-white rounded-2xl shadow-sm p-6 w-full max-w-md flex flex-col gap-5">
+          <h2 className="font-bold text-xl text-slate-800">Create Your Profile</h2>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Choose a display name</label>
+            <p className="text-xs text-slate-400 mb-2">This will be how other participants see you</p>
+            <input
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              placeholder="Your name"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-violet-400"
+            />
+          </div>
+
           {hostToken.current ? (
-            <p className="text-sm text-slate-400">You're joining as the session host and won't vote.</p>
+            <p className="text-sm text-slate-400 -mt-2">You're joining as the session host and won't vote.</p>
           ) : (
-            <label className="flex items-center gap-2 text-sm text-slate-500">
+            <label className="flex items-center gap-2 text-sm text-slate-500 -mt-2">
               <input type="checkbox" checked={asObserver} onChange={(e) => setAsObserver(e.target.checked)} />
               Join as observer (won't vote)
             </label>
           )}
-          <button type="submit" className="bg-violet-600 text-white rounded-lg py-2 font-medium">
+
+          <AvatarPicker selectedId={avatarDraft} onSelect={setAvatarDraft} />
+
+          <button
+            type="submit"
+            disabled={!canContinue}
+            className="bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white rounded-lg py-2.5 font-medium"
+          >
             Continue
           </button>
         </form>

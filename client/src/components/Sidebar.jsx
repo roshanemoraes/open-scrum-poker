@@ -23,7 +23,7 @@ export default function Sidebar({ participants, currentItem }) {
         <div className="flex flex-col gap-2">
           {voters.map((p) => (
             <div key={p.id} className="flex items-center gap-2">
-              <Avatar id={p.id} name={p.name} size={30} />
+              <Avatar id={p.id} avatarId={p.avatarId} name={p.name} size={30} />
               <span className="text-sm text-slate-700 truncate flex-1">
                 {p.name}
                 {p.isHost && <span className="text-violet-500 text-[10px] font-semibold ml-1">HOST</span>}
@@ -46,7 +46,7 @@ export default function Sidebar({ participants, currentItem }) {
           <div className="flex flex-col gap-2">
             {observers.map((p) => (
               <div key={p.id} className="flex items-center gap-2">
-                <Avatar id={p.id} name={p.name} size={30} />
+                <Avatar id={p.id} avatarId={p.avatarId} name={p.name} size={30} />
                 <span className="text-sm text-slate-500 truncate">
                   {p.name}
                   {p.isHost && <span className="text-violet-500 text-[10px] font-semibold ml-1">HOST</span>}
