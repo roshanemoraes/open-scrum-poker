@@ -168,6 +168,7 @@ export default function Room() {
   }
 
   const canVote = !isSelfObserver(room);
+  const bothFinalsSet = !room.currentItem || (room.currentItem.rci.final != null && room.currentItem.effort.final != null);
 
   return (
     <div className="min-h-screen p-4 md:p-6">
@@ -229,6 +230,7 @@ export default function Room() {
               onRemove={(itemId) => socket.emit('remove-item', { itemId })}
               onPrev={() => socket.emit('set-current-item', { index: room.currentItemIndex - 1 })}
               onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
+              canNavigate={bothFinalsSet}
             />
           ) : (
             <ItemHeader
@@ -238,6 +240,7 @@ export default function Room() {
               isHost={isHost}
               onPrev={() => socket.emit('set-current-item', { index: room.currentItemIndex - 1 })}
               onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
+              canNavigate={bothFinalsSet}
             />
           )}
 
@@ -249,9 +252,11 @@ export default function Room() {
               participants={room.participants}
               isHost={isHost}
               canVote={canVote && !!room.currentItem}
+              canNavigate={bothFinalsSet}
               onVote={(value) => socket.emit('vote', { pollType: 'rci', value })}
               onReveal={() => socket.emit('reveal', { pollType: 'rci' })}
               onReset={() => socket.emit('reset-poll', { pollType: 'rci' })}
+              onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
               onSetFinal={(value) => socket.emit('set-final', { pollType: 'rci', value })}
             />
             <PollPanel
@@ -261,9 +266,11 @@ export default function Room() {
               participants={room.participants}
               isHost={isHost}
               canVote={canVote && !!room.currentItem}
+              canNavigate={bothFinalsSet}
               onVote={(value) => socket.emit('vote', { pollType: 'effort', value })}
               onReveal={() => socket.emit('reveal', { pollType: 'effort' })}
               onReset={() => socket.emit('reset-poll', { pollType: 'effort' })}
+              onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
               onSetFinal={(value) => socket.emit('set-final', { pollType: 'effort', value })}
             />
           </div>

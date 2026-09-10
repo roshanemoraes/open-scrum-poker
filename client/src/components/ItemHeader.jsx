@@ -2,7 +2,7 @@ import { ExternalLinkIcon } from './Icons.jsx';
 
 const JIRA_BASE = 'https://synergenhealth.atlassian.net/browse/';
 
-export default function ItemHeader({ item, index, total, isHost, onPrev, onNext }) {
+export default function ItemHeader({ item, index, total, isHost, onPrev, onNext, canNavigate = true }) {
   if (!item) {
     return (
       <div className="bg-white rounded-2xl shadow-sm p-4 text-center text-slate-400 text-sm">
@@ -18,7 +18,8 @@ export default function ItemHeader({ item, index, total, isHost, onPrev, onNext 
       {isHost && (
         <button
           onClick={onPrev}
-          disabled={index <= 0}
+          disabled={index <= 0 || !canNavigate}
+          title={!canNavigate ? 'Set both RCI and Effort final values before moving on' : undefined}
           className="text-xs px-2 py-1.5 rounded-lg bg-slate-100 disabled:opacity-30 shrink-0"
         >
           ← Prev
@@ -40,7 +41,8 @@ export default function ItemHeader({ item, index, total, isHost, onPrev, onNext 
       {isHost && (
         <button
           onClick={onNext}
-          disabled={index >= total - 1}
+          disabled={index >= total - 1 || !canNavigate}
+          title={!canNavigate ? 'Set both RCI and Effort final values before moving on' : undefined}
           className="text-xs px-2 py-1.5 rounded-lg bg-slate-100 disabled:opacity-30 shrink-0"
         >
           Next →

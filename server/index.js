@@ -14,6 +14,7 @@ import {
   addItem,
   removeItem,
   setCurrentItemIndex,
+  canLeaveCurrentItem,
   vote,
   reveal,
   resetPoll,
@@ -178,6 +179,7 @@ io.on('connection', (socket) => {
   socket.on('set-current-item', ({ index }) => {
     const room = requireHost();
     if (!room) return;
+    if (index !== room.currentItemIndex && !canLeaveCurrentItem(room)) return;
     setCurrentItemIndex(room, index);
     emitRoom(roomId);
   });

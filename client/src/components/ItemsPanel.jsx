@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 const ITEM_PREFIX = 'PRB-';
 
-export default function ItemsPanel({ items, currentItemIndex, isHost, onAdd, onSelect, onRemove, onPrev, onNext }) {
+export default function ItemsPanel({ items, currentItemIndex, isHost, onAdd, onSelect, onRemove, onPrev, onNext, canNavigate = true }) {
   const [newNumber, setNewNumber] = useState('');
 
   function handleAdd(e) {
@@ -21,14 +21,16 @@ export default function ItemsPanel({ items, currentItemIndex, isHost, onAdd, onS
         <div className="flex gap-2">
           <button
             onClick={onPrev}
-            disabled={currentItemIndex <= 0}
+            disabled={currentItemIndex <= 0 || !canNavigate}
+            title={!canNavigate ? 'Set both RCI and Effort final values before moving on' : undefined}
             className="text-xs px-2 py-1 rounded-lg bg-slate-100 disabled:opacity-30"
           >
             ← Prev
           </button>
           <button
             onClick={onNext}
-            disabled={currentItemIndex >= items.length - 1}
+            disabled={currentItemIndex >= items.length - 1 || !canNavigate}
+            title={!canNavigate ? 'Set both RCI and Effort final values before moving on' : undefined}
             className="text-xs px-2 py-1 rounded-lg bg-slate-100 disabled:opacity-30"
           >
             Next →
@@ -36,15 +38,24 @@ export default function ItemsPanel({ items, currentItemIndex, isHost, onAdd, onS
         </div>
       </div>
 
+      {!canNavigate && (
+        <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5 mb-3">
+          Set both RCI and Effort final values for this item before switching items.
+        </p>
+      )}
+
       <div className="flex flex-col gap-1 max-h-40 overflow-y-auto mb-3">
-        {items.map((item, idx) => (
+        {items.map((item, idx) => {
+          const locked = !canNavigate && idx !== currentItemIndex;
+          return (
           <div
             key={item.id}
             className={[
-              'flex items-center justify-between rounded-lg px-3 py-2 text-sm cursor-pointer',
+              'flex items-center justify-between rounded-lg px-3 py-2 text-sm',
+              locked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer',
               idx === currentItemIndex ? 'bg-violet-100 text-violet-800 font-medium' : 'hover:bg-slate-50 text-slate-600',
             ].join(' ')}
-            onClick={() => onSelect(idx)}
+            onClick={() => !locked && onSelect(idx)}
           >
             <span className="truncate">{idx + 1}. {item.name}</span>
             {isHost && (
@@ -59,7 +70,8 @@ export default function ItemsPanel({ items, currentItemIndex, isHost, onAdd, onS
               </button>
             )}
           </div>
-        ))}
+          );
+        })}
         {items.length === 0 && <p className="text-sm text-slate-300 px-1">No items yet</p>}
       </div>
 

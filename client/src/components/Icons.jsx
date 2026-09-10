@@ -60,6 +60,14 @@ export function ExternalLinkIcon(props) {
   );
 }
 
+export function ChevronRightIcon(props) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
 export function Logo({ size = 36 }) {
   return (
     <div

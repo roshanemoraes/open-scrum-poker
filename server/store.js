@@ -68,6 +68,13 @@ export function setCurrentItemIndex(room, index) {
   return true;
 }
 
+// Host must confirm both final values before leaving the item they're on.
+export function canLeaveCurrentItem(room) {
+  const item = currentItem(room);
+  if (!item) return true;
+  return item.rci.final != null && item.effort.final != null;
+}
+
 export function vote(room, participantId, pollType, value) {
   const item = currentItem(room);
   if (!item) return false;
