@@ -17,7 +17,13 @@ import ItemsPanel from '../components/ItemsPanel.jsx';
 import ItemHeader from '../components/ItemHeader.jsx';
 import PollPanel from '../components/PollPanel.jsx';
 import AvatarPicker from '../components/AvatarPicker.jsx';
-import { Logo, LinkIcon, ListIcon, DownloadIcon, PowerIcon } from '../components/Icons.jsx';
+import SettingsMenu from '../components/SettingsMenu.jsx';
+import Toast from '../components/Toast.jsx';
+import { Logo } from '../components/Icons.jsx';
+import addFriendLogo from '../assets/add-friend.png';
+import manageItemsLogo from '../assets/manageItems.png';
+import downloadLogo from '../assets/download.png';
+import powerLogo from '../assets/power-switch.png';
 
 const RCI_DECK = ['1', '2', '3', '4', '5', '?'];
 const EFFORT_DECK = ['0', '1', '2', '3', '5', '8', '13', '21', '34', '55', '89', '?'];
@@ -36,6 +42,7 @@ export default function Room() {
   const [room, setRoom] = useState(null);
   const [copied, setCopied] = useState(false);
   const [manageItems, setManageItems] = useState(false);
+  const [toast, setToast] = useState(null);
   const hostToken = useRef(getHostToken());
 
   useEffect(() => {
@@ -71,6 +78,19 @@ export default function Room() {
       socket.disconnect();
       navigate('/');
     });
+    function showToast(next) {
+      setToast(next);
+      setTimeout(() => setToast((cur) => (cur === next ? null : cur)), 4500);
+    }
+    socket.on('jira-sync', (payload) => {
+      const label = payload.pollType === 'rci' ? 'RCI' : 'Effort';
+      showToast(
+        payload.ok
+          ? { type: 'success', title: 'Synced!', message: `${label} synced to ${payload.itemName} in Jira` }
+          : { type: 'error', title: 'Sync failed', message: `${label} for ${payload.itemName}: ${payload.error}` }
+      );
+    });
+    socket.on('add-item-error', ({ error }) => showToast({ type: 'error', title: 'Error', message: error }));
 
     if (socket.connected) doJoin();
 
@@ -80,6 +100,8 @@ export default function Room() {
       socket.off('join-error');
       socket.off('room-state');
       socket.off('session-ended');
+      socket.off('jira-sync');
+      socket.off('add-item-error');
       socket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -172,6 +194,12 @@ export default function Room() {
 
   return (
     <div className="min-h-screen p-4 md:p-6">
+      {toast && (
+        <div className="fixed top-4 right-4 z-[1000]">
+          <Toast type={toast.type} title={toast.title} message={toast.message} onClose={() => setToast(null)} />
+        </div>
+      )}
+
       <header className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-5 py-3 mb-4 gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <Logo />
@@ -187,30 +215,29 @@ export default function Room() {
             onClick={copyShareLink}
             className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-2"
           >
-            <LinkIcon /> {copied ? 'Copied!' : 'Invite Others'}
+            <img src={addFriendLogo} alt="Invite" className="w-5 h-5 shrink-0" /> {copied ? 'Copied!' : 'Invite Others'}
           </button>
           {isHost && (
             <button
               onClick={() => setManageItems((v) => !v)}
               className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-2"
             >
-              <ListIcon /> {manageItems ? 'Close Item Setup' : 'Manage Items'}
+              <img src={manageItemsLogo} alt="Manage Items" className="w-5 h-5 shrink-0" /> {manageItems ? 'Close Item Setup' : 'Manage Items'}
             </button>
           )}
           {isHost && (
-            <button
-              onClick={downloadExcel}
-              className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-2"
-            >
-              <DownloadIcon /> Download Excel
-            </button>
+            <SettingsMenu
+              items={[
+                { label: 'Download Excel', icon: <img src={downloadLogo} alt="Download" className="w-4 h-4" />, onClick: downloadExcel },
+              ]}
+            />
           )}
           {isHost && (
             <button
               onClick={endSession}
               className="flex items-center gap-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 rounded-lg px-3 py-2"
             >
-              <PowerIcon /> End Session
+              <img src={powerLogo} alt="End Session" className="w-5 h-5 shrink-0" /> End Session
             </button>
           )}
         </div>
@@ -246,7 +273,7 @@ export default function Room() {
 
           <div className="flex flex-col md:flex-row gap-4">
             <PollPanel
-              title="RCI"
+              title="Requirement Clarity Index(RCI)"
               deck={RCI_DECK}
               poll={room.currentItem?.rci}
               participants={room.participants}

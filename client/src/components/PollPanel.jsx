@@ -5,6 +5,7 @@ import RippleButton from './RippleButton.jsx';
 import ProgressRing from './ProgressRing.jsx';
 import Confetti from './Confetti.jsx';
 import { ChevronRightIcon } from './Icons.jsx';
+import waitingForVotersImg from '../assets/waitingTillVotersJoin.png';
 
 function computeConsensus(poll) {
   if (!poll?.revealed || !poll.votes) return null;
@@ -53,6 +54,7 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
   }
 
   const voters = participants.filter((p) => !p.isObserver);
+  const noVoters = voters.length === 0;
   const distinctValues = poll.revealed ? [...new Set(Object.values(poll.votes || {}))] : [];
 
   return (
@@ -69,14 +71,16 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
       </div>
 
       {isHost && (
-        <div className="flex justify-center">
+        <div className="flex justify-center mt-4">
           {!poll.revealed ? (
-            <RippleButton
-              onClick={onReveal}
-              className="text-sm font-semibold border-2 border-violet-600 text-violet-700 bg-white hover:bg-violet-50 rounded-[10px] px-5 py-2"
-            >
-              Reveal votes
-            </RippleButton>
+            !noVoters && (
+              <RippleButton
+                onClick={onReveal}
+                className="text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 active:bg-violet-800 rounded-lg px-5 py-2 shadow-sm transition-colors"
+              >
+                Reveal votes
+              </RippleButton>
+            )
           ) : (
             <RippleButton
               onClick={onNext}
@@ -95,8 +99,14 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
         </div>
       )}
 
+      {noVoters && (
+        <div className="flex flex-col items-center justify-center py-4">
+          <img src={waitingForVotersImg} alt="Waiting for voters to join" className="w-70 h-auto" />
+        </div>
+      )}
+
       <div ref={rowRef} className="flex flex-wrap justify-center gap-2">
-        {voters.map((p) => {
+        {!noVoters && voters.map((p) => {
           const voted = poll.votedIds.includes(p.id);
           const value = poll.revealed ? poll.votes?.[p.id] : null;
           const flipped = poll.revealed && voted;
@@ -139,14 +149,16 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
         })}
       </div>
 
-      <div className="flex flex-wrap justify-center gap-2">
-        {voters.map((p) => (
-          <div key={p.id} className="w-14 flex flex-col items-center gap-1">
-            <Avatar id={p.id} avatarId={p.avatarId} name={p.name} size={32} />
-            <span className="text-[10px] text-slate-500 truncate w-full text-center">{p.name}</span>
-          </div>
-        ))}
-      </div>
+      {!noVoters && (
+        <div className="flex flex-wrap justify-center gap-2">
+          {voters.map((p) => (
+            <div key={p.id} className="w-14 flex flex-col items-center gap-1">
+              <Avatar id={p.id} avatarId={p.avatarId} name={p.name} size={32} />
+              <span className="text-[10px] text-slate-500 truncate w-full text-center">{p.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {poll.revealed && consensus && (
         <div className="flex items-center justify-center gap-3">

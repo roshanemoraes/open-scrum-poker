@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'node:http';
 import { Server } from 'socket.io';
@@ -15,6 +16,7 @@ import {
   removeItem,
   setCurrentItemIndex,
   canLeaveCurrentItem,
+  currentItem,
   vote,
   reveal,
   resetPoll,
@@ -27,6 +29,7 @@ import {
 
 const DECKS = { rci: RCI_DECK, effort: EFFORT_DECK };
 import { buildWorkbook } from './exportXlsx.js';
+import { fetchIssue, isJiraConfigured, pushFinalValue, getJiraBaseUrl } from './jira.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
@@ -56,6 +59,23 @@ app.post('/api/rooms', (req, res) => {
 app.get('/api/rooms/:id', (req, res) => {
   if (!roomExists(req.params.id)) return res.status(404).json({ error: 'Room not found' });
   res.json({ ok: true });
+});
+
+app.get('/api/jira-config', (req, res) => {
+  res.json({ configured: isJiraConfigured(), baseUrl: getJiraBaseUrl() });
+});
+
+app.get('/api/jira/:key', async (req, res) => {
+  if (!isJiraConfigured()) return res.status(501).json({ error: 'Jira integration is not configured' });
+  if (!/^[A-Z][A-Z0-9]*-\d+$/i.test(req.params.key)) return res.status(400).json({ error: 'Invalid issue key' });
+
+  try {
+    const issue = await fetchIssue(req.params.key);
+    if (issue.notFound) return res.status(404).json({ error: 'Issue not found' });
+    res.json(issue);
+  } catch (err) {
+    res.status(502).json({ error: 'Failed to reach Jira' });
+  }
 });
 
 app.get('/api/rooms/:id/export', (req, res) => {
@@ -155,17 +175,43 @@ io.on('connection', (socket) => {
     emitRoom(roomId);
   });
 
-  socket.on('set-final', ({ pollType, value }) => {
+  socket.on('set-final', async ({ pollType, value }) => {
     const room = requireHost();
     if (!room) return;
     setFinal(room, pollType, value);
     emitRoom(roomId);
+
+    if (!isJiraConfigured()) return;
+    const item = currentItem(room);
+    if (!item) return;
+
+    try {
+      await pushFinalValue(item.name, pollType, value);
+      io.to(roomId).emit('jira-sync', { itemName: item.name, pollType, ok: true });
+    } catch (err) {
+      io.to(roomId).emit('jira-sync', { itemName: item.name, pollType, ok: false, error: err.message });
+    }
   });
 
-  socket.on('add-item', ({ name }) => {
+  socket.on('add-item', async ({ name }) => {
     const room = requireHost();
-    if (!room || !name?.trim()) return;
-    addItem(room, name.trim());
+    const trimmed = name?.trim();
+    if (!room || !trimmed) return;
+
+    if (isJiraConfigured()) {
+      try {
+        const issue = await fetchIssue(trimmed);
+        if (issue.notFound) {
+          socket.emit('add-item-error', { name: trimmed, error: `${trimmed} was not found in Jira` });
+          return;
+        }
+      } catch (err) {
+        socket.emit('add-item-error', { name: trimmed, error: `Couldn't verify ${trimmed} in Jira: ${err.message}` });
+        return;
+      }
+    }
+
+    addItem(room, trimmed);
     emitRoom(roomId);
   });
 
