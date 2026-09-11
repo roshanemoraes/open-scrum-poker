@@ -34,6 +34,17 @@ npm start       # serves API + built client from one process, on $PORT (default 
 |---|---|---|
 | `HOST_PASSWORD` | `changeme` | Shared password for scheduler/host login. **Set this before deploying.** |
 | `PORT` | `3001` | Port the single Node process listens on. |
+| `JIRA_BASE_URL` | `https://synergenhealth.atlassian.net` | Your Atlassian site. |
+| `JIRA_EMAIL` | — | Email of the Atlassian account used to call the Jira API. |
+| `JIRA_API_TOKEN` | — | API token for that account ([generate one](https://id.atlassian.com/manage-profile/security/api-tokens)). |
+| `JIRA_RCI_FIELD_NAME` | `Requirement Clarity Index` | Display name of the Jira field the RCI final value is written to. |
+| `JIRA_STORY_POINTS_FIELD_NAME` | `Story Points` | Display name of the Jira field the Effort final value is written to. |
+
+### Syncing final values back to Jira
+
+When the host confirms a final RCI or Effort value for an item (via `set-final`), and Jira is configured, the server writes that value straight into the matching custom field on the Jira issue (`item.name`, e.g. `PRB-1042`) — resolving the field's internal ID from its display name automatically via Jira's `/rest/api/3/field`. Everyone in the room sees a brief toast confirming success or explaining a failure (e.g. a non-numeric value like `?`, a missing field, or a Jira API error). This is a real write to your Jira site the moment a final value is set — there's no separate "push" step or undo.
+
+`JIRA_EMAIL`/`JIRA_API_TOKEN` are optional — without them the "View" drawer's Jira endpoint returns a 501 and the drawer shows an error instead of issue details. The item name itself (e.g. `PRB-1042`) must match a real issue key in that Jira site for the lookup to succeed.
 
 ## How it works
 
