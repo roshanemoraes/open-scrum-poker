@@ -37,8 +37,8 @@ npm start       # serves API + built client from one process, on $PORT (default 
 | `JIRA_BASE_URL` | `https://<your-organization>.atlassian.net` | Your Atlassian site. |
 | `JIRA_EMAIL` | — | Email of the Atlassian account used to call the Jira API. |
 | `JIRA_API_TOKEN` | — | API token for that account ([generate one](https://id.atlassian.com/manage-profile/security/api-tokens)). |
-| `JIRA_RCI_FIELD_NAME` | `Requirement Clarity Index` | Display name of the Jira field the RCI final value is written to. |
-| `JIRA_STORY_POINTS_FIELD_NAME` | `Story Points` | Display name of the Jira field the Effort final value is written to. |
+| `RCI_FIELD_NAME` | `Requirement Clarity Index` | Display name of the Jira field the RCI final value is written to. |
+| `STORY_POINTS_FIELD_NAME` | `Story Points` | Display name of the Jira field the Effort final value is written to. |
 
 ### Syncing final values back to Jira
 

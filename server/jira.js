@@ -4,8 +4,8 @@ const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
 
 // Display names of the Jira custom fields to sync final values into.
 // Override via env if your site names them differently.
-const RCI_FIELD_NAME = process.env.JIRA_RCI_FIELD_NAME;
-const STORY_POINTS_FIELD_NAME = process.env.JIRA_STORY_POINTS_FIELD_NAME;
+const RCI_FIELD_NAME = process.env.RCI_FIELD_NAME || 'Requirement Clarity Index';
+const STORY_POINTS_FIELD_NAME = process.env.STORY_POINTS_FIELD_NAME || 'Story Points';
 
 export function isJiraConfigured() {
   return !!(JIRA_EMAIL && JIRA_API_TOKEN);
