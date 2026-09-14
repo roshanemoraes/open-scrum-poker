@@ -12,14 +12,15 @@
 // Leaves all sockets connected so participants stay "online" in the UI —
 // stop the process (Ctrl+C) to disconnect everyone and clean up.
 
+import 'dotenv/config';
 import { io } from 'socket.io-client';
 
 const args = process.argv.slice(2);
 const count = Number(args.find((a) => /^\d+$/.test(a))) || 15;
 const urlFlagIndex = args.indexOf('--url');
-const BASE = urlFlagIndex !== -1 ? args[urlFlagIndex + 1] : 'http://localhost:3001';
+const BASE = urlFlagIndex !== -1 ? args[urlFlagIndex + 1] : `http://localhost:${process.env.PORT || 3001}`;
 const passwordFlagIndex = args.indexOf('--password');
-const PASSWORD = passwordFlagIndex !== -1 ? args[passwordFlagIndex + 1] : 'changeme';
+const PASSWORD = passwordFlagIndex !== -1 ? args[passwordFlagIndex + 1] : (process.env.HOST_PASSWORD || 'changeme');
 const CAST_VOTES = args.includes('--vote');
 
 const FIRST_NAMES = [
@@ -69,8 +70,8 @@ const hostToken = await hostLogin();
 const roomId = await createRoom(hostToken, `Load Test - ${count} voters`);
 
 const host = await join('Scheduler', roomId, 'host-bot', { hostToken });
-host.emit('add-item', { name: 'PRB-1001' });
-host.emit('add-item', { name: 'PRB-1002' });
+host.emit('add-item', { name: 'PRB-6' });
+host.emit('add-item', { name: 'PRB-5' });
 await new Promise((r) => setTimeout(r, 150));
 
 const sockets = [];
@@ -92,4 +93,4 @@ console.log(`${count} voters + 1 host connected${CAST_VOTES ? ' (all voted)' : '
 console.log('Leaving sockets open — press Ctrl+C to disconnect everyone.');
 
 // Keep the process (and its sockets) alive.
-setInterval(() => {}, 60000);
+setInterval(() => { }, 60000);

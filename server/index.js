@@ -126,8 +126,8 @@ io.on('connection', (socket) => {
       name: (name || 'Guest').trim().slice(0, 40) || 'Guest',
       avatarId: Number.isInteger(avatarId) ? avatarId : null,
       isHost: host,
-      // The host runs the session and never votes, regardless of the observer checkbox.
-      isObserver: host || !!isObserver,
+      // Hosts are observers by default; a room can opt in to letting the host vote too.
+      isObserver: host ? !room.config.hostCanVote : !!isObserver,
       connected: true,
     };
 

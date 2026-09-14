@@ -24,6 +24,7 @@ function normalizeConfig(config) {
 
   return {
     itemPrefix: typeof config?.itemPrefix === 'string' ? config.itemPrefix.trim() : '',
+    hostCanVote: !!config?.hostCanVote,
     polls: resolvedPolls,
   };
 }

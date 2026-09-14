@@ -4,6 +4,7 @@ import { hostLogin, createRoom, roomExists } from '../lib/api.js';
 import { getHostToken, setHostToken, clearHostToken, getName, setName } from '../lib/storage.js';
 import { Logo } from '../components/Icons.jsx';
 import PollConfigField from '../components/PollConfigField.jsx';
+import Switch from '../components/Switch.jsx';
 import { CUSTOM_OPTION_ID, VOTING_PRESETS, parseCustomValues, withUnknownCard } from '../lib/votingSystems.js';
 import jiraLogo from '../assets/icons/jira.png';
 import binocularsLogo from '../assets/icons/binoculars.png';
@@ -60,8 +61,9 @@ export default function Home() {
   const [effortCustomName, setEffortCustomName] = useState('');
   const [effortCustomValues, setEffortCustomValues] = useState('');
 
-  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(true);
   const [itemPrefix, setItemPrefix] = useState('');
+  const [hostCanVote, setHostCanVote] = useState(false);
 
   useEffect(() => {
     if (linkedRoom) {
@@ -135,6 +137,7 @@ export default function Home() {
     try {
       const config = {
         itemPrefix: itemPrefix.trim(),
+        hostCanVote,
         polls: {
           rci: buildPollConfig(rciEnabled, rciPreset, rciCustomName, rciCustomValues, 'Requirement Clarity Index'),
           effort: buildPollConfig(effortEnabled, effortPreset, effortCustomName, effortCustomValues, 'Effort'),
@@ -299,17 +302,27 @@ export default function Home() {
                           <span className={`transition-transform ${optionsOpen ? 'rotate-180' : ''}`}>⌄</span>
                         </button>
                         {optionsOpen && (
-                          <div className="px-3 pb-3 pt-1 border-t border-slate-100">
-                            <label className="text-xs text-slate-500">Item prefix (optional)</label>
-                            <input
-                              value={itemPrefix}
-                              onChange={(e) => setItemPrefix(e.target.value)}
-                              placeholder="e.g. PRB-"
-                              className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus:border-violet-400"
-                            />
-                            <p className="text-xs text-slate-400 mt-1">
-                              Prefixed to the number a host types when adding an item. Leave blank to type full issue keys.
-                            </p>
+                          <div className="px-3 pb-3 pt-1 border-t border-slate-100 flex flex-col gap-3">
+                            <div>
+                              <label className="text-xs text-slate-500">Item prefix (optional)</label>
+                              <input
+                                value={itemPrefix}
+                                onChange={(e) => setItemPrefix(e.target.value)}
+                                placeholder="e.g. PRB-"
+                                className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus:border-violet-400"
+                              />
+                              <p className="text-xs text-slate-400 mt-1">
+                                Prefixed to the number a host types when adding an item. Leave blank to type full issue keys.
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-sm text-slate-700">Host can vote</p>
+                                <p className="text-xs text-slate-400">Lets the host cast votes like a regular participant.</p>
+                              </div>
+                              <Switch checked={hostCanVote} onChange={setHostCanVote} label="Host can vote" />
+                            </div>
                           </div>
                         )}
                       </div>

@@ -20,7 +20,7 @@ export default function Sidebar({ participants, currentItem, pollConfig, selfId 
   const pollTypes = Object.entries(pollConfig || {});
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-4 w-64 shrink-0 flex flex-col gap-4">
+    <div className="bg-white rounded-2xl shadow-sm p-4 w-64 shrink-0 flex flex-col gap-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] overflow-y-auto">
       <div>
         <div className="flex items-center gap-1.5 mb-2">
           <img src={participantsLogo} alt="" className="w-4 h-4 shrink-0" />
