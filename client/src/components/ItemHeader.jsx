@@ -78,7 +78,7 @@ export default function ItemHeader({ item, index, total, isHost, onNext, canNavi
         <button
           onClick={onNext}
           disabled={index >= total - 1 || !canNavigate}
-          title={!canNavigate ? 'Set both RCI and Effort final values before moving on' : undefined}
+          title={!canNavigate ? 'Set final values for this item before moving on' : undefined}
           className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-30 shrink-0"
         >
           Next <img src={rightLogo} alt="" className="w-3.5 h-3.5 shrink-0" />

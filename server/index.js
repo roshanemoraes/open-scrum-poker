@@ -23,11 +23,8 @@ import {
   resetItemVotes,
   setFinal,
   toPublicRoom,
-  RCI_DECK,
-  EFFORT_DECK,
 } from './store.js';
 
-const DECKS = { rci: RCI_DECK, effort: EFFORT_DECK };
 import { buildWorkbook } from './exportXlsx.js';
 import { fetchIssue, isJiraConfigured, pushFinalValue, getJiraBaseUrl } from './jira.js';
 
@@ -52,7 +49,7 @@ app.post('/api/host-login', (req, res) => {
 app.post('/api/rooms', (req, res) => {
   const hostToken = req.header('x-host-token');
   if (!isHostToken(hostToken)) return res.status(403).json({ error: 'Host login required' });
-  const room = createRoom(req.body?.name);
+  const room = createRoom(req.body?.name, req.body?.config);
   res.json({ id: room.id, name: room.name });
 });
 
@@ -149,21 +146,21 @@ io.on('connection', (socket) => {
     const room = getRoom(roomId);
     if (!room || !participantId) return;
     if (room.participants[socket.id]?.isObserver) return;
-    if (!DECKS[pollType]?.includes(value)) return;
+    if (!room.config.polls[pollType]?.deck.includes(value)) return;
     vote(room, participantId, pollType, value);
     emitRoom(roomId);
   });
 
   socket.on('reveal', ({ pollType }) => {
     const room = requireHost();
-    if (!room) return;
+    if (!room || !room.config.polls[pollType]) return;
     reveal(room, pollType);
     emitRoom(roomId);
   });
 
   socket.on('reset-poll', ({ pollType }) => {
     const room = requireHost();
-    if (!room) return;
+    if (!room || !room.config.polls[pollType]) return;
     resetPoll(room, pollType);
     emitRoom(roomId);
   });
@@ -177,7 +174,7 @@ io.on('connection', (socket) => {
 
   socket.on('set-final', async ({ pollType, value }) => {
     const room = requireHost();
-    if (!room) return;
+    if (!room || !room.config.polls[pollType]) return;
     setFinal(room, pollType, value);
     emitRoom(roomId);
 

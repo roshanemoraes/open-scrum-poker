@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { hostLogin, createRoom, roomExists } from '../lib/api.js';
 import { getHostToken, setHostToken, clearHostToken, getName, setName } from '../lib/storage.js';
 import { Logo } from '../components/Icons.jsx';
+import PollConfigField from '../components/PollConfigField.jsx';
+import { CUSTOM_OPTION_ID, VOTING_PRESETS, parseCustomValues, withUnknownCard } from '../lib/votingSystems.js';
 import jiraLogo from '../assets/jira.png';
 import binocularsLogo from '../assets/binoculars.png';
 import downloadLogo from '../assets/download.png';
@@ -48,6 +50,19 @@ export default function Home() {
   const [newRoomName, setNewRoomName] = useState('Sprint Planning');
   const [creating, setCreating] = useState(false);
 
+  const [rciEnabled, setRciEnabled] = useState(true);
+  const [rciPreset, setRciPreset] = useState('rci-scale');
+  const [rciCustomName, setRciCustomName] = useState('');
+  const [rciCustomValues, setRciCustomValues] = useState('');
+
+  const [effortEnabled, setEffortEnabled] = useState(true);
+  const [effortPreset, setEffortPreset] = useState('fibonacci');
+  const [effortCustomName, setEffortCustomName] = useState('');
+  const [effortCustomValues, setEffortCustomValues] = useState('');
+
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [itemPrefix, setItemPrefix] = useState('');
+
   useEffect(() => {
     if (linkedRoom) {
       setRoomCode(linkedRoom);
@@ -86,12 +101,46 @@ export default function Home() {
     setHostTokenState(null);
   }
 
+  function buildPollConfig(enabled, presetId, customName, customValues, defaultLabel) {
+    if (!enabled) return { enabled: false };
+    if (presetId === CUSTOM_OPTION_ID) {
+      return {
+        enabled: true,
+        label: customName.trim() || defaultLabel,
+        deck: withUnknownCard(parseCustomValues(customValues)),
+      };
+    }
+    const preset = VOTING_PRESETS.find((p) => p.id === presetId);
+    return { enabled: true, label: defaultLabel, deck: withUnknownCard(preset?.values || []) };
+  }
+
   async function handleCreateRoom(e) {
     e.preventDefault();
     if (!hostToken || !newRoomName.trim()) return;
+    if (!rciEnabled && !effortEnabled) {
+      setLoginError('Enable at least one voting table.');
+      return;
+    }
+    if (rciEnabled && rciPreset === CUSTOM_OPTION_ID && parseCustomValues(rciCustomValues).length < 2) {
+      setLoginError('RCI custom system needs at least two values.');
+      return;
+    }
+    if (effortEnabled && effortPreset === CUSTOM_OPTION_ID && parseCustomValues(effortCustomValues).length < 2) {
+      setLoginError('Effort custom system needs at least two values.');
+      return;
+    }
+
+    setLoginError('');
     setCreating(true);
     try {
-      const room = await createRoom(hostToken, newRoomName.trim());
+      const config = {
+        itemPrefix: itemPrefix.trim(),
+        polls: {
+          rci: buildPollConfig(rciEnabled, rciPreset, rciCustomName, rciCustomValues, 'Requirement Clarity Index'),
+          effort: buildPollConfig(effortEnabled, effortPreset, effortCustomName, effortCustomValues, 'Effort'),
+        },
+      };
+      const room = await createRoom(hostToken, newRoomName.trim(), config);
       navigate(`/room/${room.id}`);
     } catch (err) {
       if (err.message.includes('Host login')) handleLogout();
@@ -216,6 +265,55 @@ export default function Home() {
                         value={newRoomName}
                         onChange={(e) => setNewRoomName(e.target.value)}
                       />
+
+                      <PollConfigField
+                        label="Requirement Clarity Index (RCI)"
+                        enabled={rciEnabled}
+                        onToggle={setRciEnabled}
+                        presetId={rciPreset}
+                        onPresetChange={setRciPreset}
+                        customName={rciCustomName}
+                        onCustomNameChange={setRciCustomName}
+                        customValues={rciCustomValues}
+                        onCustomValuesChange={setRciCustomValues}
+                      />
+                      <PollConfigField
+                        label="Effort"
+                        enabled={effortEnabled}
+                        onToggle={setEffortEnabled}
+                        presetId={effortPreset}
+                        onPresetChange={setEffortPreset}
+                        customName={effortCustomName}
+                        onCustomNameChange={setEffortCustomName}
+                        customValues={effortCustomValues}
+                        onCustomValuesChange={setEffortCustomValues}
+                      />
+
+                      <div className="border border-slate-200 rounded-xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setOptionsOpen((v) => !v)}
+                          className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-inset"
+                        >
+                          Options
+                          <span className={`transition-transform ${optionsOpen ? 'rotate-180' : ''}`}>⌄</span>
+                        </button>
+                        {optionsOpen && (
+                          <div className="px-3 pb-3 pt-1 border-t border-slate-100">
+                            <label className="text-xs text-slate-500">Item prefix (optional)</label>
+                            <input
+                              value={itemPrefix}
+                              onChange={(e) => setItemPrefix(e.target.value)}
+                              placeholder="e.g. PRB-"
+                              className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus:border-violet-400"
+                            />
+                            <p className="text-xs text-slate-400 mt-1">
+                              Prefixed to the number a host types when adding an item. Leave blank to type full issue keys.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
                       {loginError && <p className="text-sm text-red-500">{loginError}</p>}
                       <button
                         type="submit"

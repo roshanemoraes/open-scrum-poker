@@ -3,24 +3,50 @@ import { nanoid } from 'nanoid';
 // Everything lives in memory only. Restarting the process clears all rooms.
 const rooms = new Map();
 
-export const EFFORT_DECK = ['0', '1', '2', '3', '5', '8', '13', '21', '34', '55', '89', '?'];
-export const RCI_DECK = ['1', '2', '3', '4', '5', '?'];
+export const DEFAULT_POLL_CONFIG = {
+  rci: { enabled: true, label: 'Requirement Clarity Index', deck: ['1', '2', '3', '4', '5', '?'] },
+  effort: { enabled: true, label: 'Effort', deck: ['0', '1', '2', '3', '5', '8', '13', '21', '34', '55', '89', '?'] },
+};
 
-function makeItem(name) {
+function normalizeConfig(config) {
+  const source = config?.polls || DEFAULT_POLL_CONFIG;
+  const polls = {};
+
+  for (const [type, poll] of Object.entries(source)) {
+    if (!poll?.enabled) continue;
+    const deck = Array.isArray(poll.deck) && poll.deck.length > 0 ? poll.deck : DEFAULT_POLL_CONFIG[type]?.deck;
+    if (!deck) continue;
+    polls[type] = { enabled: true, label: poll.label || type, deck };
+  }
+
+  // At least one voting table must exist; fall back to the defaults rather than leaving a room unusable.
+  const resolvedPolls = Object.keys(polls).length > 0 ? polls : DEFAULT_POLL_CONFIG;
+
   return {
-    id: nanoid(8),
-    name,
-    rci: { votes: {}, revealed: false, final: null },
-    effort: { votes: {}, revealed: false, final: null },
+    itemPrefix: typeof config?.itemPrefix === 'string' ? config.itemPrefix.trim() : '',
+    polls: resolvedPolls,
   };
 }
 
-export function createRoom(name) {
+function enabledPollTypes(room) {
+  return Object.keys(room.config.polls);
+}
+
+function makeItem(room, name) {
+  const item = { id: nanoid(8), name };
+  for (const type of enabledPollTypes(room)) {
+    item[type] = { votes: {}, revealed: false, final: null };
+  }
+  return item;
+}
+
+export function createRoom(name, config) {
   const id = nanoid(8);
   const room = {
     id,
     name: name || 'Sprint Planning',
     createdAt: Date.now(),
+    config: normalizeConfig(config),
     items: [],
     currentItemIndex: -1,
     participants: {}, // socketId -> { id, name, avatarId, isHost, isObserver, connected }
@@ -42,7 +68,7 @@ export function roomExists(id) {
 }
 
 export function addItem(room, name) {
-  const item = makeItem(name);
+  const item = makeItem(room, name);
   room.items.push(item);
   if (room.currentItemIndex === -1) room.currentItemIndex = 0;
   return item;
@@ -68,11 +94,11 @@ export function setCurrentItemIndex(room, index) {
   return true;
 }
 
-// Host must confirm both final values before leaving the item they're on.
+// Host must confirm final values for every enabled poll before leaving the item they're on.
 export function canLeaveCurrentItem(room) {
   const item = currentItem(room);
   if (!item) return true;
-  return item.rci.final != null && item.effort.final != null;
+  return enabledPollTypes(room).every((type) => item[type]?.final != null);
 }
 
 export function vote(room, participantId, pollType, value) {
@@ -86,13 +112,13 @@ export function vote(room, participantId, pollType, value) {
 
 export function reveal(room, pollType) {
   const item = currentItem(room);
-  if (!item) return;
+  if (!item?.[pollType]) return;
   item[pollType].revealed = true;
 }
 
 export function resetPoll(room, pollType) {
   const item = currentItem(room);
-  if (!item) return;
+  if (!item?.[pollType]) return;
   item[pollType].votes = {};
   item[pollType].revealed = false;
   item[pollType].final = null;
@@ -101,17 +127,16 @@ export function resetPoll(room, pollType) {
 export function resetItemVotes(room) {
   const item = currentItem(room);
   if (!item) return;
-  item.rci.votes = {};
-  item.rci.revealed = false;
-  item.rci.final = null;
-  item.effort.votes = {};
-  item.effort.revealed = false;
-  item.effort.final = null;
+  for (const type of enabledPollTypes(room)) {
+    item[type].votes = {};
+    item[type].revealed = false;
+    item[type].final = null;
+  }
 }
 
 export function setFinal(room, pollType, value) {
   const item = currentItem(room);
-  if (!item) return;
+  if (!item?.[pollType]) return;
   item[pollType].final = value;
 }
 
@@ -136,19 +161,20 @@ export function toPublicRoom(room, participantId) {
     };
   };
 
+  const currentItemPolls = {};
+  if (item) {
+    for (const type of enabledPollTypes(room)) {
+      currentItemPolls[type] = scrub(item[type]);
+    }
+  }
+
   return {
     id: room.id,
     name: room.name,
+    config: room.config,
     items: room.items.map((i) => ({ id: i.id, name: i.name })),
     currentItemIndex: room.currentItemIndex,
-    currentItem: item
-      ? {
-          id: item.id,
-          name: item.name,
-          rci: scrub(item.rci),
-          effort: scrub(item.effort),
-        }
-      : null,
+    currentItem: item ? { id: item.id, name: item.name, ...currentItemPolls } : null,
     participants,
   };
 }

@@ -25,9 +25,6 @@ import manageItemsLogo from '../assets/manageItems.png';
 import downloadLogo from '../assets/download.png';
 import powerLogo from '../assets/power-switch.png';
 
-const RCI_DECK = ['1', '2', '3', '4', '5', '?'];
-const EFFORT_DECK = ['0', '1', '2', '3', '5', '8', '13', '21', '34', '55', '89', '?'];
-
 export default function Room() {
   const { roomId } = useParams();
   const navigate = useNavigate();
@@ -207,7 +204,8 @@ export default function Room() {
   }
 
   const canVote = !isSelfObserver(room);
-  const bothFinalsSet = !room.currentItem || (room.currentItem.rci.final != null && room.currentItem.effort.final != null);
+  const pollTypes = Object.keys(room.config?.polls || {});
+  const bothFinalsSet = !room.currentItem || pollTypes.every((type) => room.currentItem[type]?.final != null);
 
   return (
     <div className="min-h-screen p-4 md:p-6">
@@ -270,6 +268,7 @@ export default function Room() {
               currentItemIndex={room.currentItemIndex}
               isHost={isHost}
               adding={addingItem}
+              itemPrefix={room.config?.itemPrefix || ''}
               onAdd={(names) => {
                 const list = Array.isArray(names) ? names : [names];
                 if (list.length === 0) return;
@@ -298,34 +297,21 @@ export default function Room() {
           )}
 
           <div className="flex flex-col md:flex-row gap-4">
-            <PollPanel
-              title="Requirement Clarity Index(RCI)"
-              deck={RCI_DECK}
-              poll={room.currentItem?.rci}
-              participants={room.participants}
-              isHost={isHost}
-              canVote={canVote && !!room.currentItem}
-              canNavigate={bothFinalsSet}
-              onVote={(value) => socket.emit('vote', { pollType: 'rci', value })}
-              onReveal={() => socket.emit('reveal', { pollType: 'rci' })}
-              onReset={() => socket.emit('reset-poll', { pollType: 'rci' })}
-              onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
-              onSetFinal={(value) => socket.emit('set-final', { pollType: 'rci', value })}
-            />
-            <PollPanel
-              title="Effort"
-              deck={EFFORT_DECK}
-              poll={room.currentItem?.effort}
-              participants={room.participants}
-              isHost={isHost}
-              canVote={canVote && !!room.currentItem}
-              canNavigate={bothFinalsSet}
-              onVote={(value) => socket.emit('vote', { pollType: 'effort', value })}
-              onReveal={() => socket.emit('reveal', { pollType: 'effort' })}
-              onReset={() => socket.emit('reset-poll', { pollType: 'effort' })}
-              onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
-              onSetFinal={(value) => socket.emit('set-final', { pollType: 'effort', value })}
-            />
+            {pollTypes.map((type) => (
+              <PollPanel
+                key={type}
+                title={room.config.polls[type].label}
+                deck={room.config.polls[type].deck}
+                poll={room.currentItem?.[type]}
+                participants={room.participants}
+                isHost={isHost}
+                canVote={canVote && !!room.currentItem}
+                onVote={(value) => socket.emit('vote', { pollType: type, value })}
+                onReveal={() => socket.emit('reveal', { pollType: type })}
+                onReset={() => socket.emit('reset-poll', { pollType: type })}
+                onSetFinal={(value) => socket.emit('set-final', { pollType: type, value })}
+              />
+            ))}
           </div>
         </div>
       </div>

@@ -8,11 +8,11 @@ export async function hostLogin(password) {
   return res.json();
 }
 
-export async function createRoom(hostToken, name) {
+export async function createRoom(hostToken, name, config) {
   const res = await fetch('/api/rooms', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, config }),
   });
   if (!res.ok) throw new Error((await res.json()).error || 'Could not create room');
   return res.json();
