@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { EyeIcon, ExternalLinkIcon } from './Icons.jsx';
 import { getJiraBaseUrl } from '../lib/jiraConfig.js';
 import JiraDrawer from './JiraDrawer.jsx';
 import jiraLogo from '../assets/jira.png';
 import eyeLogo from '../assets/eye.png'
 import openInBrowserLogo from '../assets/open-in-browser.png'
+import rightLogo from '../assets/right.png'
 
 const TITLE_CHAR_LIMIT = 50;
 
@@ -35,7 +35,7 @@ export default function ItemHeader({ item, index, total, isHost, onNext, canNavi
   if (!item) {
     return (
       <div className="bg-white rounded-2xl shadow-sm p-4 text-center text-slate-400 text-sm">
-        No active item yet.
+        No active items yet.
       </div>
     );
   }
@@ -79,9 +79,9 @@ export default function ItemHeader({ item, index, total, isHost, onNext, canNavi
           onClick={onNext}
           disabled={index >= total - 1 || !canNavigate}
           title={!canNavigate ? 'Set both RCI and Effort final values before moving on' : undefined}
-          className="text-xs px-2 py-1.5 rounded-lg bg-slate-100 disabled:opacity-30 shrink-0"
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-30 shrink-0"
         >
-          Next →
+          Next <img src={rightLogo} alt="" className="w-3.5 h-3.5 shrink-0" />
         </button>
       )}
 

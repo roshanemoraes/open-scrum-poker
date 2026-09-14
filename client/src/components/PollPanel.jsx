@@ -4,7 +4,6 @@ import CardDeck from './CardDeck.jsx';
 import RippleButton from './RippleButton.jsx';
 import ProgressRing from './ProgressRing.jsx';
 import Confetti from './Confetti.jsx';
-import { ChevronRightIcon } from './Icons.jsx';
 import waitingForVotersImg from '../assets/waitingTillVotersJoin.png';
 
 function computeConsensus(poll) {
@@ -20,7 +19,7 @@ function computeConsensus(poll) {
   return { value: best.value, percent: (best.count / values.length) * 100 };
 }
 
-export default function PollPanel({ title, deck, poll, participants, isHost, canVote, canNavigate = true, onVote, onReveal, onReset, onNext, onSetFinal }) {
+export default function PollPanel({ title, deck, poll, participants, isHost, canVote, onVote, onReveal, onReset, onSetFinal }) {
   const rowRef = useRef(null);
   const prevRevealed = useRef(poll?.revealed);
   const [burstKey, setBurstKey] = useState(0);
@@ -70,27 +69,14 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
         )}
       </div>
 
-      {isHost && (
+      {isHost && !poll.revealed && !noVoters && (
         <div className="flex justify-center mt-4">
-          {!poll.revealed ? (
-            !noVoters && (
-              <RippleButton
-                onClick={onReveal}
-                className="text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 active:bg-violet-800 rounded-lg px-5 py-2 shadow-sm transition-colors"
-              >
-                Reveal votes
-              </RippleButton>
-            )
-          ) : (
-            <RippleButton
-              onClick={onNext}
-              disabled={!canNavigate}
-              title={!canNavigate ? 'Set both RCI and Effort final values before moving on' : undefined}
-              className="flex items-center gap-1 text-sm font-semibold border-2 border-violet-600 text-violet-700 bg-white hover:bg-violet-50 disabled:opacity-40 disabled:hover:bg-white rounded-[10px] px-5 py-2"
-            >
-              Next round <ChevronRightIcon width={16} height={16} />
-            </RippleButton>
-          )}
+          <RippleButton
+            onClick={onReveal}
+            className="text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 active:bg-violet-800 rounded-lg px-5 py-2 shadow-sm transition-colors"
+          >
+            Reveal votes
+          </RippleButton>
         </div>
       )}
       {!isHost && (
@@ -207,14 +193,6 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
             className="text-xs font-medium border border-slate-300 text-slate-600 hover:bg-slate-50 rounded-[10px] px-3 py-1.5"
           >
             ↺ Revote
-          </button>
-          <button
-            onClick={onNext}
-            disabled={!canNavigate}
-            title={!canNavigate ? 'Set both RCI and Effort final values before moving on' : undefined}
-            className="text-xs font-medium border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-white rounded-[10px] px-3 py-1.5"
-          >
-            Next →
           </button>
         </div>
       )}

@@ -1,4 +1,6 @@
 import Avatar from './Avatar.jsx';
+import groupLogo from '../assets/add-friend.png';
+import binocularsLogo from '../assets/binoculars.png';
 
 function StatusDot({ label, voted, revealed }) {
   return (
@@ -19,7 +21,10 @@ export default function Sidebar({ participants, currentItem, selfId }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-4 w-64 shrink-0 flex flex-col gap-4">
       <div>
-        <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2">Participants</h3>
+        <div className="flex items-center gap-1.5 mb-2">
+          <img src={groupLogo} alt="" className="w-4 h-4 shrink-0" />
+          <h3 className="text-xs font-semibold text-slate-400 uppercase">Participants</h3>
+        </div>
         <div className="flex flex-col gap-2">
           {voters.map((p) => (
             <div key={p.id} className="flex items-center gap-2">
@@ -43,7 +48,10 @@ export default function Sidebar({ participants, currentItem, selfId }) {
 
       {observers.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2">Observers</h3>
+          <div className="flex items-center gap-1.5 mb-2">
+            <img src={binocularsLogo} alt="" className="w-4 h-4 shrink-0" />
+            <h3 className="text-xs font-semibold text-slate-400 uppercase">Observers</h3>
+          </div>
           <div className="flex flex-col gap-2">
             {observers.map((p) => (
               <div key={p.id} className="flex items-center gap-2">

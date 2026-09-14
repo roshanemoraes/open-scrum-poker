@@ -2,13 +2,38 @@ import { useState } from 'react';
 
 const ITEM_PREFIX = 'PRB-';
 
-export default function ItemsPanel({ items, currentItemIndex, isHost, onAdd, onSelect, onRemove, onPrev, onNext, canNavigate = true }) {
+export default function ItemsPanel({ items, currentItemIndex, isHost, adding, onAdd, onSelect, onRemove, onPrev, onNext, canNavigate = true }) {
   const [newNumber, setNewNumber] = useState('');
+  const [duplicateError, setDuplicateError] = useState('');
 
   function handleAdd(e) {
     e.preventDefault();
-    if (!newNumber.trim()) return;
-    onAdd(ITEM_PREFIX + newNumber.trim());
+    if (!newNumber.trim() || adding) return;
+
+    const numbers = newNumber.split(',').map((n) => n.trim()).filter(Boolean);
+    const existingNames = new Set(items.map((i) => i.name.toLowerCase()));
+    const seen = new Set();
+    const duplicates = [];
+    const toAdd = [];
+
+    for (const number of numbers) {
+      const fullName = ITEM_PREFIX + number;
+      const key = fullName.toLowerCase();
+      if (existingNames.has(key) || seen.has(key)) {
+        duplicates.push(fullName);
+        continue;
+      }
+      seen.add(key);
+      toAdd.push(fullName);
+    }
+
+    if (duplicates.length > 0) {
+      setDuplicateError(`Already in this sprint (skipped): ${duplicates.join(', ')}`);
+    } else {
+      setDuplicateError('');
+    }
+
+    if (toAdd.length > 0) onAdd(toAdd);
     setNewNumber('');
   }
 
@@ -81,16 +106,29 @@ export default function ItemsPanel({ items, currentItemIndex, isHost, onAdd, onS
             <span className="pl-3 text-sm text-slate-400 select-none">{ITEM_PREFIX}</span>
             <input
               value={newNumber}
-              onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, ''))}
-              placeholder="1234"
-              inputMode="numeric"
-              className="flex-1 min-w-0 text-sm py-1.5 pr-3 pl-1 outline-none"
+              onChange={(e) => {
+                setNewNumber(e.target.value.replace(/[^\d,\s]/g, ''));
+                setDuplicateError('');
+              }}
+              placeholder="1234, 5678, 9012"
+              disabled={adding}
+              className="flex-1 min-w-0 text-sm py-1.5 pr-3 pl-1 outline-none disabled:opacity-50"
             />
           </div>
-          <button type="submit" className="text-sm bg-violet-600 text-white rounded-lg px-3 py-1.5">
-            Add
+          <button
+            type="submit"
+            disabled={adding}
+            className="flex items-center gap-1.5 text-sm bg-violet-600 text-white rounded-lg px-3 py-1.5 disabled:opacity-60"
+          >
+            {adding && (
+              <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            )}
+            {adding ? 'Adding…' : 'Add'}
           </button>
         </form>
+      )}
+      {duplicateError && (
+        <p className="text-xs text-red-500 mt-1.5">{duplicateError}</p>
       )}
     </div>
   );

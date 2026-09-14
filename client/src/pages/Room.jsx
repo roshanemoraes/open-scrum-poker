@@ -43,7 +43,9 @@ export default function Room() {
   const [copied, setCopied] = useState(false);
   const [manageItems, setManageItems] = useState(false);
   const [toast, setToast] = useState(null);
+  const [addingItem, setAddingItem] = useState(false);
   const hostToken = useRef(getHostToken());
+  const addItemQueue = useRef([]);
 
   useEffect(() => {
     if (needsProfile) return;
@@ -73,14 +75,17 @@ export default function Room() {
       setErrorMsg(error);
       setStatus('error');
     });
-    socket.on('room-state', (state) => setRoom(state));
+    socket.on('room-state', (state) => {
+      setRoom(state);
+      processAddItemQueue();
+    });
     socket.on('session-ended', () => {
       socket.disconnect();
       navigate('/');
     });
     function showToast(next) {
       setToast(next);
-      setTimeout(() => setToast((cur) => (cur === next ? null : cur)), 4500);
+      setTimeout(() => setToast((cur) => (cur === next ? null : cur)), 6000);
     }
     socket.on('jira-sync', (payload) => {
       const label = payload.pollType === 'rci' ? 'RCI' : 'Effort';
@@ -90,7 +95,19 @@ export default function Room() {
           : { type: 'error', title: 'Sync failed', message: `${label} for ${payload.itemName}: ${payload.error}` }
       );
     });
-    socket.on('add-item-error', ({ error }) => showToast({ type: 'error', title: 'Error', message: error }));
+    socket.on('add-item-error', ({ error }) => {
+      showToast({ type: 'error', title: 'Error', message: error });
+      processAddItemQueue();
+    });
+
+    function processAddItemQueue() {
+      const next = addItemQueue.current.shift();
+      if (next) {
+        socket.emit('add-item', { name: next });
+      } else {
+        setAddingItem(false);
+      }
+    }
 
     if (socket.connected) doJoin();
 
@@ -252,7 +269,16 @@ export default function Room() {
               items={room.items}
               currentItemIndex={room.currentItemIndex}
               isHost={isHost}
-              onAdd={(name) => socket.emit('add-item', { name })}
+              adding={addingItem}
+              onAdd={(names) => {
+                const list = Array.isArray(names) ? names : [names];
+                if (list.length === 0) return;
+                addItemQueue.current.push(...list);
+                if (!addingItem) {
+                  setAddingItem(true);
+                  socket.emit('add-item', { name: addItemQueue.current.shift() });
+                }
+              }}
               onSelect={(index) => socket.emit('set-current-item', { index })}
               onRemove={(itemId) => socket.emit('remove-item', { itemId })}
               onPrev={() => socket.emit('set-current-item', { index: room.currentItemIndex - 1 })}
