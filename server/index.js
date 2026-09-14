@@ -198,6 +198,11 @@ io.on('connection', (socket) => {
     const trimmed = name?.trim();
     if (!room || !trimmed) return;
 
+    if (room.items.some((i) => i.name.toLowerCase() === trimmed.toLowerCase())) {
+      socket.emit('add-item-error', { name: trimmed, error: `${trimmed} is already in this sprint` });
+      return;
+    }
+
     if (isJiraConfigured()) {
       try {
         const issue = await fetchIssue(trimmed);
