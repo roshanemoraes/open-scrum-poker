@@ -1,31 +1,18 @@
-// Dev-only helper: spins up a room with N simulated voters against a
-// running server, so you can eyeball the UI at scale without opening N
-// browser tabs. Usage:
-//
-//   node scripts/populate.mjs [count] [--url http://localhost:3001] [--password changeme] [--vote]
-//
-// Examples:
-//   node scripts/populate.mjs 15
-//   node scripts/populate.mjs 40 --vote          # also casts RCI/Effort votes
-//   node scripts/populate.mjs 8 --url http://10.10.46.117:3001
-//
-// Leaves all sockets connected so participants stay "online" in the UI —
-// stop the process (Ctrl+C) to disconnect everyone and clean up.
-
+import 'dotenv/config';
 import { io } from 'socket.io-client';
 
 const args = process.argv.slice(2);
 const count = Number(args.find((a) => /^\d+$/.test(a))) || 15;
 const urlFlagIndex = args.indexOf('--url');
-const BASE = urlFlagIndex !== -1 ? args[urlFlagIndex + 1] : 'http://localhost:3001';
+const BASE = urlFlagIndex !== -1 ? args[urlFlagIndex + 1] : `http://localhost:${process.env.PORT || 3001}`;
 const passwordFlagIndex = args.indexOf('--password');
-const PASSWORD = passwordFlagIndex !== -1 ? args[passwordFlagIndex + 1] : 'changeme';
+const PASSWORD = passwordFlagIndex !== -1 ? args[passwordFlagIndex + 1] : (process.env.HOST_PASSWORD || 'changeme');
 const CAST_VOTES = args.includes('--vote');
 
 const FIRST_NAMES = [
-  'Alice', 'Bob', 'Chinthani', 'Dinishika', 'Ehan', 'Fathima', 'Gayan', 'Hasini', 'Ishan', 'Janith',
-  'Krishalika', 'Lasith', 'Malsha', 'Nipuna', 'Oshini', 'Pavan', 'Ruwan', 'Sanduni', 'Tharindu', 'Umesha',
-  'Vindya', 'Yasas', 'Zara', 'Ashen', 'Buddhi', 'Charith', 'Dulani', 'Erandi', 'Farah', 'Gimhani',
+  'Alice', 'Bob', 'Charlie', 'Daniel', 'Ethan', 'Fiona', 'George', 'Hannah', 'Isaac', 'Jack',
+  'Katherine', 'Liam', 'Mia', 'Noah', 'Olivia', 'Peter', 'Rachel', 'Samuel', 'Thomas', 'Emily',
+  'Victoria', 'William', 'Zoe', 'Andrew', 'Benjamin', 'Chloe', 'David', 'Emma', 'Frank', 'Grace',
 ];
 
 function nameFor(i) {
@@ -69,8 +56,8 @@ const hostToken = await hostLogin();
 const roomId = await createRoom(hostToken, `Load Test - ${count} voters`);
 
 const host = await join('Scheduler', roomId, 'host-bot', { hostToken });
-host.emit('add-item', { name: 'PRB-1001' });
-host.emit('add-item', { name: 'PRB-1002' });
+host.emit('add-item', { name: 'PRB-6' });
+host.emit('add-item', { name: 'PRB-5' });
 await new Promise((r) => setTimeout(r, 150));
 
 const sockets = [];
@@ -92,4 +79,4 @@ console.log(`${count} voters + 1 host connected${CAST_VOTES ? ' (all voted)' : '
 console.log('Leaving sockets open — press Ctrl+C to disconnect everyone.');
 
 // Keep the process (and its sockets) alive.
-setInterval(() => {}, 60000);
+setInterval(() => { }, 60000);

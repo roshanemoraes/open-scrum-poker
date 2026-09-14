@@ -1,8 +1,6 @@
 import { useState } from 'react';
 
-const ITEM_PREFIX = 'PRB-';
-
-export default function ItemsPanel({ items, currentItemIndex, isHost, adding, onAdd, onSelect, onRemove, onPrev, onNext, canNavigate = true }) {
+export default function ItemsPanel({ items, currentItemIndex, isHost, adding, itemPrefix = '', onAdd, onSelect, onRemove, onPrev, onNext, canNavigate = true }) {
   const [newNumber, setNewNumber] = useState('');
   const [duplicateError, setDuplicateError] = useState('');
 
@@ -17,7 +15,7 @@ export default function ItemsPanel({ items, currentItemIndex, isHost, adding, on
     const toAdd = [];
 
     for (const number of numbers) {
-      const fullName = ITEM_PREFIX + number;
+      const fullName = itemPrefix + number;
       const key = fullName.toLowerCase();
       if (existingNames.has(key) || seen.has(key)) {
         duplicates.push(fullName);
@@ -47,7 +45,7 @@ export default function ItemsPanel({ items, currentItemIndex, isHost, adding, on
           <button
             onClick={onPrev}
             disabled={currentItemIndex <= 0 || !canNavigate}
-            title={!canNavigate ? 'Set both RCI and Effort final values before moving on' : undefined}
+            title={!canNavigate ? 'Set final values for this item before moving on' : undefined}
             className="text-xs px-2 py-1 rounded-lg bg-slate-100 disabled:opacity-30"
           >
             ← Prev
@@ -55,7 +53,7 @@ export default function ItemsPanel({ items, currentItemIndex, isHost, adding, on
           <button
             onClick={onNext}
             disabled={currentItemIndex >= items.length - 1 || !canNavigate}
-            title={!canNavigate ? 'Set both RCI and Effort final values before moving on' : undefined}
+            title={!canNavigate ? 'Set final values for this item before moving on' : undefined}
             className="text-xs px-2 py-1 rounded-lg bg-slate-100 disabled:opacity-30"
           >
             Next →
@@ -65,7 +63,7 @@ export default function ItemsPanel({ items, currentItemIndex, isHost, adding, on
 
       {!canNavigate && (
         <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5 mb-3">
-          Set both RCI and Effort final values for this item before switching items.
+          Set final values for this item before switching items.
         </p>
       )}
 
@@ -103,16 +101,17 @@ export default function ItemsPanel({ items, currentItemIndex, isHost, adding, on
       {isHost && (
         <form onSubmit={handleAdd} className="flex gap-2">
           <div className="flex-1 flex items-center border border-slate-200 rounded-lg overflow-hidden focus-within:border-violet-400">
-            <span className="pl-3 text-sm text-slate-400 select-none">{ITEM_PREFIX}</span>
+            {itemPrefix && <span className="pl-3 text-sm text-slate-400 select-none">{itemPrefix}</span>}
             <input
               value={newNumber}
               onChange={(e) => {
-                setNewNumber(e.target.value.replace(/[^\d,\s]/g, ''));
+                const raw = e.target.value;
+                setNewNumber(itemPrefix ? raw.replace(/[^\d,\s]/g, '') : raw);
                 setDuplicateError('');
               }}
-              placeholder="1234, 5678, 9012"
+              placeholder={itemPrefix ? '1234, 5678, 9012' : 'ABC-1234, ABC-5678'}
               disabled={adding}
-              className="flex-1 min-w-0 text-sm py-1.5 pr-3 pl-1 outline-none disabled:opacity-50"
+              className={`flex-1 min-w-0 text-sm py-1.5 pr-3 outline-none disabled:opacity-50 ${itemPrefix ? 'pl-1' : 'pl-3'}`}
             />
           </div>
           <button

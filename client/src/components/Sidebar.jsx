@@ -1,6 +1,6 @@
-import Avatar from './Avatar.jsx';
-import groupLogo from '../assets/add-friend.png';
-import binocularsLogo from '../assets/binoculars.png';
+import Avatar from './avatar/Avatar.jsx';
+import participantsLogo from '../assets/icons/participants.png';
+import binocularsLogo from '../assets/icons/binoculars.png';
 
 function StatusDot({ label, voted, revealed }) {
   return (
@@ -14,15 +14,16 @@ function StatusDot({ label, voted, revealed }) {
   );
 }
 
-export default function Sidebar({ participants, currentItem, selfId }) {
+export default function Sidebar({ participants, currentItem, pollConfig, selfId }) {
   const voters = participants.filter((p) => !p.isObserver);
   const observers = participants.filter((p) => p.isObserver);
+  const pollTypes = Object.entries(pollConfig || {});
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-4 w-64 shrink-0 flex flex-col gap-4">
+    <div className="bg-white rounded-2xl shadow-sm p-4 w-64 shrink-0 flex flex-col gap-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] overflow-y-auto">
       <div>
         <div className="flex items-center gap-1.5 mb-2">
-          <img src={groupLogo} alt="" className="w-4 h-4 shrink-0" />
+          <img src={participantsLogo} alt="" className="w-4 h-4 shrink-0" />
           <h3 className="text-xs font-semibold text-slate-400 uppercase">Participants</h3>
         </div>
         <div className="flex flex-col gap-2">
@@ -36,8 +37,14 @@ export default function Sidebar({ participants, currentItem, selfId }) {
               </span>
               {currentItem && (
                 <div className="flex gap-1">
-                  <StatusDot label="RCI" voted={currentItem.rci?.votedIds.includes(p.id)} revealed={currentItem.rci?.revealed} />
-                  <StatusDot label="Effort" voted={currentItem.effort?.votedIds.includes(p.id)} revealed={currentItem.effort?.revealed} />
+                  {pollTypes.map(([type, poll]) => (
+                    <StatusDot
+                      key={type}
+                      label={poll.label}
+                      voted={currentItem[type]?.votedIds.includes(p.id)}
+                      revealed={currentItem[type]?.revealed}
+                    />
+                  ))}
                 </div>
               )}
             </div>

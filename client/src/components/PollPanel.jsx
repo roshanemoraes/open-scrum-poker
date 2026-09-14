@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Avatar from './Avatar.jsx';
+import Avatar from './avatar/Avatar.jsx';
 import CardDeck from './CardDeck.jsx';
 import RippleButton from './RippleButton.jsx';
 import ProgressRing from './ProgressRing.jsx';
 import Confetti from './Confetti.jsx';
-import waitingForVotersImg from '../assets/waitingTillVotersJoin.png';
+import waitingForVotersImg from '../assets/illustrations/waiting-for-voters.png';
 
 function computeConsensus(poll) {
   if (!poll?.revealed || !poll.votes) return null;

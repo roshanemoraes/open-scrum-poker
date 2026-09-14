@@ -16,17 +16,14 @@ import Sidebar from '../components/Sidebar.jsx';
 import ItemsPanel from '../components/ItemsPanel.jsx';
 import ItemHeader from '../components/ItemHeader.jsx';
 import PollPanel from '../components/PollPanel.jsx';
-import AvatarPicker from '../components/AvatarPicker.jsx';
+import AvatarPicker from '../components/avatar/AvatarPicker.jsx';
 import SettingsMenu from '../components/SettingsMenu.jsx';
 import Toast from '../components/Toast.jsx';
 import { Logo } from '../components/Icons.jsx';
-import addFriendLogo from '../assets/add-friend.png';
-import manageItemsLogo from '../assets/manageItems.png';
-import downloadLogo from '../assets/download.png';
-import powerLogo from '../assets/power-switch.png';
-
-const RCI_DECK = ['1', '2', '3', '4', '5', '?'];
-const EFFORT_DECK = ['0', '1', '2', '3', '5', '8', '13', '21', '34', '55', '89', '?'];
+import inviteLogo from '../assets/icons/invite.png';
+import manageItemsLogo from '../assets/icons/manage-items.png';
+import downloadLogo from '../assets/icons/download.png';
+import endSessionLogo from '../assets/icons/end-session.png';
 
 export default function Room() {
   const { roomId } = useParams();
@@ -207,7 +204,8 @@ export default function Room() {
   }
 
   const canVote = !isSelfObserver(room);
-  const bothFinalsSet = !room.currentItem || (room.currentItem.rci.final != null && room.currentItem.effort.final != null);
+  const pollTypes = Object.keys(room.config?.polls || {});
+  const bothFinalsSet = !room.currentItem || pollTypes.every((type) => room.currentItem[type]?.final != null);
 
   return (
     <div className="min-h-screen p-4 md:p-6">
@@ -232,7 +230,7 @@ export default function Room() {
             onClick={copyShareLink}
             className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-2"
           >
-            <img src={addFriendLogo} alt="Invite" className="w-5 h-5 shrink-0" /> {copied ? 'Copied!' : 'Invite Others'}
+            <img src={inviteLogo} alt="Invite" className="w-5 h-5 shrink-0" /> {copied ? 'Copied!' : 'Invite Others'}
           </button>
           {isHost && (
             <button
@@ -254,14 +252,19 @@ export default function Room() {
               onClick={endSession}
               className="flex items-center gap-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 rounded-lg px-3 py-2"
             >
-              <img src={powerLogo} alt="End Session" className="w-5 h-5 shrink-0" /> End Session
+              <img src={endSessionLogo} alt="End Session" className="w-5 h-5 shrink-0" /> End Session
             </button>
           )}
         </div>
       </header>
 
       <div className="flex flex-col lg:flex-row gap-4">
-        <Sidebar participants={room.participants} currentItem={room.currentItem} selfId={getParticipantId(room.id)} />
+        <Sidebar
+          participants={room.participants}
+          currentItem={room.currentItem}
+          pollConfig={room.config?.polls}
+          selfId={getParticipantId(room.id)}
+        />
 
         <div className="flex-1 flex flex-col gap-4 min-w-0">
           {isHost && manageItems ? (
@@ -270,6 +273,7 @@ export default function Room() {
               currentItemIndex={room.currentItemIndex}
               isHost={isHost}
               adding={addingItem}
+              itemPrefix={room.config?.itemPrefix || ''}
               onAdd={(names) => {
                 const list = Array.isArray(names) ? names : [names];
                 if (list.length === 0) return;
@@ -298,34 +302,21 @@ export default function Room() {
           )}
 
           <div className="flex flex-col md:flex-row gap-4">
-            <PollPanel
-              title="Requirement Clarity Index(RCI)"
-              deck={RCI_DECK}
-              poll={room.currentItem?.rci}
-              participants={room.participants}
-              isHost={isHost}
-              canVote={canVote && !!room.currentItem}
-              canNavigate={bothFinalsSet}
-              onVote={(value) => socket.emit('vote', { pollType: 'rci', value })}
-              onReveal={() => socket.emit('reveal', { pollType: 'rci' })}
-              onReset={() => socket.emit('reset-poll', { pollType: 'rci' })}
-              onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
-              onSetFinal={(value) => socket.emit('set-final', { pollType: 'rci', value })}
-            />
-            <PollPanel
-              title="Effort"
-              deck={EFFORT_DECK}
-              poll={room.currentItem?.effort}
-              participants={room.participants}
-              isHost={isHost}
-              canVote={canVote && !!room.currentItem}
-              canNavigate={bothFinalsSet}
-              onVote={(value) => socket.emit('vote', { pollType: 'effort', value })}
-              onReveal={() => socket.emit('reveal', { pollType: 'effort' })}
-              onReset={() => socket.emit('reset-poll', { pollType: 'effort' })}
-              onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
-              onSetFinal={(value) => socket.emit('set-final', { pollType: 'effort', value })}
-            />
+            {pollTypes.map((type) => (
+              <PollPanel
+                key={type}
+                title={room.config.polls[type].label}
+                deck={room.config.polls[type].deck}
+                poll={room.currentItem?.[type]}
+                participants={room.participants}
+                isHost={isHost}
+                canVote={canVote && !!room.currentItem}
+                onVote={(value) => socket.emit('vote', { pollType: type, value })}
+                onReveal={() => socket.emit('reveal', { pollType: type })}
+                onReset={() => socket.emit('reset-poll', { pollType: type })}
+                onSetFinal={(value) => socket.emit('set-final', { pollType: type, value })}
+              />
+            ))}
           </div>
         </div>
       </div>

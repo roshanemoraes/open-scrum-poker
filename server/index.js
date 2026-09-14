@@ -23,16 +23,13 @@ import {
   resetItemVotes,
   setFinal,
   toPublicRoom,
-  RCI_DECK,
-  EFFORT_DECK,
 } from './store.js';
 
-const DECKS = { rci: RCI_DECK, effort: EFFORT_DECK };
 import { buildWorkbook } from './exportXlsx.js';
 import { fetchIssue, isJiraConfigured, pushFinalValue, getJiraBaseUrl } from './jira.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT;
 
 const app = express();
 app.use(express.json());
@@ -52,7 +49,7 @@ app.post('/api/host-login', (req, res) => {
 app.post('/api/rooms', (req, res) => {
   const hostToken = req.header('x-host-token');
   if (!isHostToken(hostToken)) return res.status(403).json({ error: 'Host login required' });
-  const room = createRoom(req.body?.name);
+  const room = createRoom(req.body?.name, req.body?.config);
   res.json({ id: room.id, name: room.name });
 });
 
@@ -129,8 +126,8 @@ io.on('connection', (socket) => {
       name: (name || 'Guest').trim().slice(0, 40) || 'Guest',
       avatarId: Number.isInteger(avatarId) ? avatarId : null,
       isHost: host,
-      // The host runs the session and never votes, regardless of the observer checkbox.
-      isObserver: host || !!isObserver,
+      // Hosts are observers by default; a room can opt in to letting the host vote too.
+      isObserver: host ? !room.config.hostCanVote : !!isObserver,
       connected: true,
     };
 
@@ -149,21 +146,21 @@ io.on('connection', (socket) => {
     const room = getRoom(roomId);
     if (!room || !participantId) return;
     if (room.participants[socket.id]?.isObserver) return;
-    if (!DECKS[pollType]?.includes(value)) return;
+    if (!room.config.polls[pollType]?.deck.includes(value)) return;
     vote(room, participantId, pollType, value);
     emitRoom(roomId);
   });
 
   socket.on('reveal', ({ pollType }) => {
     const room = requireHost();
-    if (!room) return;
+    if (!room || !room.config.polls[pollType]) return;
     reveal(room, pollType);
     emitRoom(roomId);
   });
 
   socket.on('reset-poll', ({ pollType }) => {
     const room = requireHost();
-    if (!room) return;
+    if (!room || !room.config.polls[pollType]) return;
     resetPoll(room, pollType);
     emitRoom(roomId);
   });
@@ -177,7 +174,7 @@ io.on('connection', (socket) => {
 
   socket.on('set-final', async ({ pollType, value }) => {
     const room = requireHost();
-    if (!room) return;
+    if (!room || !room.config.polls[pollType]) return;
     setFinal(room, pollType, value);
     emitRoom(roomId);
 
