@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid';
 
-const HOST_PASSWORD = process.env.HOST_PASSWORD || 'changeme';
+const HOST_PASSWORD = process.env.HOST_PASSWORD;
 const hostTokens = new Set();
 
 export function attemptHostLogin(password) {

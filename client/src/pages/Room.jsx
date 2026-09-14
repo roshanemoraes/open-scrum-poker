@@ -16,14 +16,14 @@ import Sidebar from '../components/Sidebar.jsx';
 import ItemsPanel from '../components/ItemsPanel.jsx';
 import ItemHeader from '../components/ItemHeader.jsx';
 import PollPanel from '../components/PollPanel.jsx';
-import AvatarPicker from '../components/AvatarPicker.jsx';
+import AvatarPicker from '../components/avatar/AvatarPicker.jsx';
 import SettingsMenu from '../components/SettingsMenu.jsx';
 import Toast from '../components/Toast.jsx';
 import { Logo } from '../components/Icons.jsx';
-import addFriendLogo from '../assets/add-friend.png';
-import manageItemsLogo from '../assets/manageItems.png';
-import downloadLogo from '../assets/download.png';
-import powerLogo from '../assets/power-switch.png';
+import inviteLogo from '../assets/icons/invite.png';
+import manageItemsLogo from '../assets/icons/manage-items.png';
+import downloadLogo from '../assets/icons/download.png';
+import endSessionLogo from '../assets/icons/end-session.png';
 
 export default function Room() {
   const { roomId } = useParams();
@@ -230,7 +230,7 @@ export default function Room() {
             onClick={copyShareLink}
             className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-2"
           >
-            <img src={addFriendLogo} alt="Invite" className="w-5 h-5 shrink-0" /> {copied ? 'Copied!' : 'Invite Others'}
+            <img src={inviteLogo} alt="Invite" className="w-5 h-5 shrink-0" /> {copied ? 'Copied!' : 'Invite Others'}
           </button>
           {isHost && (
             <button
@@ -252,14 +252,19 @@ export default function Room() {
               onClick={endSession}
               className="flex items-center gap-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 rounded-lg px-3 py-2"
             >
-              <img src={powerLogo} alt="End Session" className="w-5 h-5 shrink-0" /> End Session
+              <img src={endSessionLogo} alt="End Session" className="w-5 h-5 shrink-0" /> End Session
             </button>
           )}
         </div>
       </header>
 
       <div className="flex flex-col lg:flex-row gap-4">
-        <Sidebar participants={room.participants} currentItem={room.currentItem} selfId={getParticipantId(room.id)} />
+        <Sidebar
+          participants={room.participants}
+          currentItem={room.currentItem}
+          pollConfig={room.config?.polls}
+          selfId={getParticipantId(room.id)}
+        />
 
         <div className="flex-1 flex flex-col gap-4 min-w-0">
           {isHost && manageItems ? (

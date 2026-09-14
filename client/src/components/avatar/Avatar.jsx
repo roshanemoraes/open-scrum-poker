@@ -1,4 +1,4 @@
-import { presetById, presetForSeed } from '../lib/avatarPresets.js';
+import { presetById, presetForSeed } from './avatarPresets.js';
 import AvatarFace from './AvatarFace.jsx';
 
 export default function Avatar({ avatarId, id, name, size = 40 }) {

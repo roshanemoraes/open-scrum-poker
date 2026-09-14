@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { presetsForGender } from '../lib/avatarPresets.js';
+import { presetsForGender } from './avatarPresets.js';
 import AvatarFace from './AvatarFace.jsx';
 
 const TABS = [

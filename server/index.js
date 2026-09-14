@@ -29,7 +29,7 @@ import { buildWorkbook } from './exportXlsx.js';
 import { fetchIssue, isJiraConfigured, pushFinalValue, getJiraBaseUrl } from './jira.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT;
 
 const app = express();
 app.use(express.json());

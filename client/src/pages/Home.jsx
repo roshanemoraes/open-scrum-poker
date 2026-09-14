@@ -5,9 +5,9 @@ import { getHostToken, setHostToken, clearHostToken, getName, setName } from '..
 import { Logo } from '../components/Icons.jsx';
 import PollConfigField from '../components/PollConfigField.jsx';
 import { CUSTOM_OPTION_ID, VOTING_PRESETS, parseCustomValues, withUnknownCard } from '../lib/votingSystems.js';
-import jiraLogo from '../assets/jira.png';
-import binocularsLogo from '../assets/binoculars.png';
-import downloadLogo from '../assets/download.png';
+import jiraLogo from '../assets/icons/jira.png';
+import binocularsLogo from '../assets/icons/binoculars.png';
+import downloadLogo from '../assets/icons/download.png';
 
 const FEATURES = [
   { icon: jiraLogo, title: 'Synced with Jira', description: 'Pull sprint items in and push final RCI & Effort values back out.' },

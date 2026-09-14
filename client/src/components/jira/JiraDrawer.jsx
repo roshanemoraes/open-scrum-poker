@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CloseIcon, ExternalLinkIcon } from './Icons.jsx';
+import { CloseIcon, ExternalLinkIcon } from '../Icons.jsx';
 import AdfContent from './AdfContent.jsx';
 
 const STATUS_STYLES = {

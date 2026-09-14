@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import settingsLogo from '../assets/settings.png';
+import settingsLogo from '../assets/icons/settings.png';
 
 export default function SettingsMenu({ items }) {
   const [open, setOpen] = useState(false);
