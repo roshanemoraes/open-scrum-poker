@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { hostLogin, createRoom, roomExists } from '../lib/api.js';
+import { hostLogin, createRoom, roomExists, getAtlassianLoginConfig } from '../lib/api.js';
 import { getHostToken, setHostToken, clearHostToken, getName, setName } from '../lib/storage.js';
 import { Logo } from '../components/Icons.jsx';
 import PollConfigField from '../components/PollConfigField.jsx';
@@ -17,6 +17,12 @@ const FEATURES = [
 ];
 
 const TRAFFIC_LIGHTS = ['#ff5f57', '#febc2e', '#28c840'];
+
+const ATLASSIAN_ERROR_MESSAGES = {
+  invalid_state: 'Login expired — please try again.',
+  unauthorized: "That Atlassian account isn't authorized to host sessions.",
+  login_failed: 'Atlassian login failed. Please try again.',
+};
 
 // Cross-fades its children whenever fadeKey changes; skipped under prefers-reduced-motion.
 function FadeSwap({ fadeKey, children }) {
@@ -65,12 +71,41 @@ export default function Home() {
   const [itemPrefix, setItemPrefix] = useState('');
   const [hostCanVote, setHostCanVote] = useState(false);
 
+  const [atlassianLoginEnabled, setAtlassianLoginEnabled] = useState(false);
+
   useEffect(() => {
     if (linkedRoom) {
       setRoomCode(linkedRoom);
       setTab('join');
     }
   }, [linkedRoom]);
+
+  useEffect(() => {
+    getAtlassianLoginConfig().then(({ enabled }) => setAtlassianLoginEnabled(enabled));
+  }, []);
+
+  // Pick up the redirect back from /api/auth/atlassian/callback, then scrub the URL.
+  useEffect(() => {
+    const incomingToken = searchParams.get('hostToken');
+    const atlassianError = searchParams.get('atlassianError');
+
+    if (incomingToken) {
+      setHostToken(incomingToken);
+      setHostTokenState(incomingToken);
+      setTab('host');
+    } else if (atlassianError) {
+      setLoginError(ATLASSIAN_ERROR_MESSAGES[atlassianError] || 'Atlassian login failed.');
+      setTab('host');
+    }
+
+    if (incomingToken || atlassianError) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('hostToken');
+      url.searchParams.delete('atlassianError');
+      window.history.replaceState({}, '', url.pathname + url.search);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleJoin(e) {
     e.preventDefault();
@@ -243,22 +278,34 @@ export default function Home() {
                       </button>
                     </form>
                   ) : !hostToken ? (
-                    <form onSubmit={handleHostLogin} className="flex flex-col gap-3">
-                      <input
-                        type="password"
-                        className={inputBase}
-                        placeholder="Host password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                      {loginError && <p className="text-sm text-red-500">{loginError}</p>}
-                      <button
-                        type="submit"
-                        className="bg-slate-800 hover:bg-slate-900 text-white rounded-lg py-2 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
-                      >
-                        Log in
-                      </button>
-                    </form>
+                    atlassianLoginEnabled ? (
+                      <div className="flex flex-col gap-3">
+                        {loginError && <p className="text-sm text-red-500">{loginError}</p>}
+                        <a
+                          href="/api/auth/atlassian/login"
+                          className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg py-2 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                        >
+                          Continue with Atlassian
+                        </a>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleHostLogin} className="flex flex-col gap-3">
+                        <input
+                          type="password"
+                          className={inputBase}
+                          placeholder="Host password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                        />
+                        {loginError && <p className="text-sm text-red-500">{loginError}</p>}
+                        <button
+                          type="submit"
+                          className="bg-slate-800 hover:bg-slate-900 text-white rounded-lg py-2 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                        >
+                          Log in
+                        </button>
+                      </form>
+                    )
                   ) : (
                     <form onSubmit={handleCreateRoom} className="flex flex-col gap-3">
                       <p className="text-sm text-emerald-600">Logged in as scheduler</p>

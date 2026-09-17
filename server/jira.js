@@ -69,6 +69,29 @@ export async function pushFinalValue(issueKey, pollType, value) {
   }
 }
 
+// Best-effort attribution comment — the actual field write above always runs as the
+// service account, so this is how the "who really set this" audit trail is recorded
+// when ENABLE_JIRA_ATTRIBUTION_COMMENT is on. Callers should treat failures here as
+// non-fatal (the final value itself already synced successfully).
+export async function postAttributionComment(issueKey, text) {
+  const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`, {
+    method: 'POST',
+    headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      body: {
+        type: 'doc',
+        version: 1,
+        content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Jira rejected the comment (${res.status})${body ? `: ${body.slice(0, 200)}` : ''}`);
+  }
+}
+
 export async function fetchIssue(key) {
   const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64');
   const fields = 'summary,status,issuetype,priority,assignee,reporter,created,updated,description,comment';

@@ -6,7 +6,16 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { nanoid } from 'nanoid';
 
-import { attemptHostLogin, isHostToken } from './auth.js';
+import { attemptHostLogin, issueHostToken, isHostToken, getHostSession } from './auth.js';
+import {
+  isAtlassianLoginEnabled,
+  createState,
+  consumeState,
+  buildAuthorizeUrl,
+  exchangeCodeForAccessToken,
+  fetchAtlassianIdentity,
+  isAuthorizedIdentity,
+} from './atlassianAuth.js';
 import {
   createRoom,
   getRoom,
@@ -22,11 +31,16 @@ import {
   resetPoll,
   resetItemVotes,
   setFinal,
+  upsertParticipant,
+  findParticipant,
   toPublicRoom,
 } from './store.js';
+import { setPresence, clearPresence, entriesForRoom } from './presence.js';
 
 import { buildWorkbook } from './exportXlsx.js';
-import { fetchIssue, isJiraConfigured, pushFinalValue, getJiraBaseUrl } from './jira.js';
+import { fetchIssue, isJiraConfigured, pushFinalValue, postAttributionComment, getJiraBaseUrl } from './jira.js';
+
+const ENABLE_JIRA_ATTRIBUTION_COMMENT = (process.env.ENABLE_JIRA_ATTRIBUTION_COMMENT || '').trim().toLowerCase() === 'true';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT;
@@ -46,15 +60,57 @@ app.post('/api/host-login', (req, res) => {
   res.json({ token });
 });
 
-app.post('/api/rooms', (req, res) => {
+app.get('/api/auth/atlassian/config', (req, res) => {
+  res.json({ enabled: isAtlassianLoginEnabled() });
+});
+
+app.get('/api/auth/atlassian/login', (req, res) => {
+  if (!isAtlassianLoginEnabled()) return res.status(404).end();
+  try {
+    const state = createState();
+    res.redirect(buildAuthorizeUrl(state));
+  } catch (err) {
+    res.status(500).send('Atlassian login is not configured correctly on the server.');
+  }
+});
+
+app.get('/api/auth/atlassian/callback', async (req, res) => {
+  if (!isAtlassianLoginEnabled()) return res.status(404).end();
+  const { code, state } = req.query;
+
+  if (!consumeState(state)) {
+    return res.redirect('/?atlassianError=invalid_state');
+  }
+
+  try {
+    const accessToken = await exchangeCodeForAccessToken(code);
+    const identity = await fetchAtlassianIdentity(accessToken);
+
+    if (!isAuthorizedIdentity(identity)) {
+      return res.redirect('/?atlassianError=unauthorized');
+    }
+
+    const token = issueHostToken({
+      method: 'atlassian',
+      email: identity.email,
+      name: identity.name,
+      accountId: identity.account_id,
+    });
+    res.redirect(`/?hostToken=${encodeURIComponent(token)}`);
+  } catch (err) {
+    res.redirect('/?atlassianError=login_failed');
+  }
+});
+
+app.post('/api/rooms', async (req, res) => {
   const hostToken = req.header('x-host-token');
   if (!isHostToken(hostToken)) return res.status(403).json({ error: 'Host login required' });
-  const room = createRoom(req.body?.name, req.body?.config);
+  const room = await createRoom(req.body?.name, req.body?.config);
   res.json({ id: room.id, name: room.name });
 });
 
-app.get('/api/rooms/:id', (req, res) => {
-  if (!roomExists(req.params.id)) return res.status(404).json({ error: 'Room not found' });
+app.get('/api/rooms/:id', async (req, res) => {
+  if (!(await roomExists(req.params.id))) return res.status(404).json({ error: 'Room not found' });
   res.json({ ok: true });
 });
 
@@ -75,10 +131,10 @@ app.get('/api/jira/:key', async (req, res) => {
   }
 });
 
-app.get('/api/rooms/:id/export', (req, res) => {
+app.get('/api/rooms/:id/export', async (req, res) => {
   const hostToken = req.query.token;
   if (!isHostToken(hostToken)) return res.status(403).json({ error: 'Host login required' });
-  const room = getRoom(req.params.id);
+  const room = await getRoom(req.params.id);
   if (!room) return res.status(404).json({ error: 'Room not found' });
 
   const buffer = buildWorkbook(room);
@@ -96,21 +152,23 @@ app.get(/^(?!\/api).*/, (req, res) => {
 
 // ---- Socket.IO realtime ----
 
-function emitRoom(roomId) {
-  const room = getRoom(roomId);
+async function emitRoom(roomId) {
+  const room = await getRoom(roomId);
   if (!room) return;
-  for (const [socketId, participant] of Object.entries(room.participants)) {
-    if (!participant.connected) continue;
-    io.to(socketId).emit('room-state', toPublicRoom(room, participant.id));
+  const entries = entriesForRoom(roomId);
+  const connectedIds = new Set(entries.map((e) => e.participantId));
+  for (const { socketId, participantId: viewerId } of entries) {
+    io.to(socketId).emit('room-state', await toPublicRoom(room, viewerId, connectedIds));
   }
 }
 
 io.on('connection', (socket) => {
   let roomId = null;
   let participantId = null;
+  let hostSessionToken = null;
 
-  socket.on('join', ({ roomId: rid, name, participantId: pid, avatarId, isObserver, hostToken }) => {
-    const room = getRoom(rid);
+  socket.on('join', async ({ roomId: rid, name, participantId: pid, avatarId, isObserver, hostToken }) => {
+    const room = await getRoom(rid);
     if (!room) {
       socket.emit('join-error', { error: 'Room not found' });
       return;
@@ -119,67 +177,69 @@ io.on('connection', (socket) => {
     roomId = rid;
     participantId = pid || nanoid(10);
     const host = isHostToken(hostToken);
+    if (host) hostSessionToken = hostToken;
 
-    room.participants[socket.id] = {
-      id: participantId,
-      socketId: socket.id,
+    await upsertParticipant(room, {
+      participantId,
       name: (name || 'Guest').trim().slice(0, 40) || 'Guest',
       avatarId: Number.isInteger(avatarId) ? avatarId : null,
       isHost: host,
       // Hosts are observers by default; a room can opt in to letting the host vote too.
       isObserver: host ? !room.config.hostCanVote : !!isObserver,
-      connected: true,
-    };
+    });
+    setPresence(socket.id, roomId, participantId);
 
     socket.join(roomId);
     socket.emit('joined', { participantId, isHost: host });
-    emitRoom(roomId);
+    await emitRoom(roomId);
   });
 
-  function requireHost() {
-    const room = getRoom(roomId);
-    const p = room?.participants[socket.id];
-    return room && p && p.isHost ? room : null;
+  async function requireHost() {
+    const room = await getRoom(roomId);
+    if (!room) return null;
+    const p = await findParticipant(room, participantId);
+    return p?.isHost ? room : null;
   }
 
-  socket.on('vote', ({ pollType, value }) => {
-    const room = getRoom(roomId);
+  socket.on('vote', async ({ pollType, value }) => {
+    const room = await getRoom(roomId);
     if (!room || !participantId) return;
-    if (room.participants[socket.id]?.isObserver) return;
+    const participant = await findParticipant(room, participantId);
+    if (participant?.isObserver) return;
     if (!room.config.polls[pollType]?.deck.includes(value)) return;
-    vote(room, participantId, pollType, value);
-    emitRoom(roomId);
+    await vote(room, participantId, pollType, value);
+    await emitRoom(roomId);
   });
 
-  socket.on('reveal', ({ pollType }) => {
-    const room = requireHost();
+  socket.on('reveal', async ({ pollType }) => {
+    const room = await requireHost();
     if (!room || !room.config.polls[pollType]) return;
-    reveal(room, pollType);
-    emitRoom(roomId);
+    await reveal(room, pollType);
+    await emitRoom(roomId);
   });
 
-  socket.on('reset-poll', ({ pollType }) => {
-    const room = requireHost();
+  socket.on('reset-poll', async ({ pollType }) => {
+    const room = await requireHost();
     if (!room || !room.config.polls[pollType]) return;
-    resetPoll(room, pollType);
-    emitRoom(roomId);
+    await resetPoll(room, pollType);
+    await emitRoom(roomId);
   });
 
-  socket.on('reset-item', () => {
-    const room = requireHost();
+  socket.on('reset-item', async () => {
+    const room = await requireHost();
     if (!room) return;
-    resetItemVotes(room);
-    emitRoom(roomId);
+    await resetItemVotes(room);
+    await emitRoom(roomId);
   });
 
   socket.on('set-final', async ({ pollType, value }) => {
-    const room = requireHost();
+    const room = await requireHost();
     if (!room || !room.config.polls[pollType]) return;
-    setFinal(room, pollType, value);
-    emitRoom(roomId);
+    await setFinal(room, pollType, value);
+    await emitRoom(roomId);
 
     if (!isJiraConfigured()) return;
-    const item = currentItem(room);
+    const item = await currentItem(room);
     if (!item) return;
 
     try {
@@ -187,11 +247,24 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('jira-sync', { itemName: item.name, pollType, ok: true });
     } catch (err) {
       io.to(roomId).emit('jira-sync', { itemName: item.name, pollType, ok: false, error: err.message });
+      return;
+    }
+
+    if (!ENABLE_JIRA_ATTRIBUTION_COMMENT) return;
+    const hostSession = getHostSession(hostSessionToken);
+    const participant = await findParticipant(room, participantId);
+    const actorLabel = hostSession?.email || participant?.name || 'the host';
+    const pollLabel = room.config.polls[pollType].label;
+
+    try {
+      await postAttributionComment(item.name, `${pollLabel} set to ${value} by ${actorLabel} via Planning Poker`);
+    } catch (err) {
+      console.error(`[jira] attribution comment failed for ${item.name}:`, err.message);
     }
   });
 
   socket.on('add-item', async ({ name }) => {
-    const room = requireHost();
+    const room = await requireHost();
     const trimmed = name?.trim();
     if (!room || !trimmed) return;
 
@@ -213,39 +286,36 @@ io.on('connection', (socket) => {
       }
     }
 
-    addItem(room, trimmed);
-    emitRoom(roomId);
+    await addItem(room, trimmed);
+    await emitRoom(roomId);
   });
 
-  socket.on('remove-item', ({ itemId }) => {
-    const room = requireHost();
+  socket.on('remove-item', async ({ itemId }) => {
+    const room = await requireHost();
     if (!room) return;
-    removeItem(room, itemId);
-    emitRoom(roomId);
+    await removeItem(room, itemId);
+    await emitRoom(roomId);
   });
 
-  socket.on('set-current-item', ({ index }) => {
-    const room = requireHost();
+  socket.on('set-current-item', async ({ index }) => {
+    const room = await requireHost();
     if (!room) return;
-    if (index !== room.currentItemIndex && !canLeaveCurrentItem(room)) return;
-    setCurrentItemIndex(room, index);
-    emitRoom(roomId);
+    if (index !== room.currentItemIndex && !(await canLeaveCurrentItem(room))) return;
+    await setCurrentItemIndex(room, index);
+    await emitRoom(roomId);
   });
 
-  socket.on('end-session', () => {
-    const room = requireHost();
+  socket.on('end-session', async () => {
+    const room = await requireHost();
     if (!room) return;
     io.to(roomId).emit('session-ended');
-    deleteRoom(roomId);
+    await deleteRoom(roomId);
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     if (!roomId) return;
-    const room = getRoom(roomId);
-    if (!room) return;
-    const p = room.participants[socket.id];
-    if (p) p.connected = false;
-    emitRoom(roomId);
+    clearPresence(socket.id);
+    await emitRoom(roomId);
   });
 });
 

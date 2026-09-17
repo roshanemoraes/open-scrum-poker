@@ -39,6 +39,15 @@ npm start       # serves API + built client from one process, on $PORT (default 
 | `JIRA_API_TOKEN` | — | API token for that account ([generate one](https://id.atlassian.com/manage-profile/security/api-tokens)). |
 | `RCI_FIELD_NAME` | `Requirement Clarity Index` | Display name of the Jira field the RCI final value is written to. |
 | `STORY_POINTS_FIELD_NAME` | `Story Points` | Display name of the Jira field the Effort final value is written to. |
+| `ENABLE_IN_MEMORY_STORE` | `true` | `true`/unset = in-memory (resets on restart). `false` = MongoDB-backed — see `docs/DESIGN.md` §3. |
+| `MONGODB_URI` | `mongodb://localhost:27017` | Only used when `ENABLE_IN_MEMORY_STORE=false`. |
+| `MONGODB_DB_NAME` | `open_scrum_poker` | Only used when `ENABLE_IN_MEMORY_STORE=false`. |
+| `MONGODB_ROOM_TTL_SECONDS` | `172800` (48h) | Only used when `ENABLE_IN_MEMORY_STORE=false`. How long an *ended* room's document survives before MongoDB's TTL index reaps it. |
+| `ENABLE_ATLASSIAN_LOGIN` | `false` | `false`/unset = host logs in with `HOST_PASSWORD` (today's flow). `true` = host logs in via "Continue with Atlassian" (OAuth 2.0 3LO); `HOST_PASSWORD` is then unused. |
+| `ATLASSIAN_OAUTH_CLIENT_ID` / `ATLASSIAN_OAUTH_CLIENT_SECRET` | — | Only used when `ENABLE_ATLASSIAN_LOGIN=true`. From an OAuth 2.0 (3LO) app registered at [developer.atlassian.com/console/myapps](https://developer.atlassian.com/console/myapps/). |
+| `ATLASSIAN_OAUTH_REDIRECT_URI` | — | Only used when `ENABLE_ATLASSIAN_LOGIN=true`. Must exactly match the callback URL registered on the OAuth app, e.g. `https://your-host/api/auth/atlassian/callback`. |
+| `ATLASSIAN_ALLOWED_EMAIL_DOMAINS` | — (allows any verified email) | Only used when `ENABLE_ATLASSIAN_LOGIN=true`. Comma-separated allowlist, e.g. `company.com,partner.com`. **Set this before deploying** — leaving it blank lets any Atlassian account host. |
+| `ENABLE_JIRA_ATTRIBUTION_COMMENT` | `false` | `true` = post a Jira comment attributing who actually set a final value (their Atlassian email if logged in that way, else their display name) — the field write itself always runs as the service account, so this is how the real author gets recorded. Best-effort; a comment failure doesn't affect the sync. |
 
 ### Syncing final values back to Jira
 
