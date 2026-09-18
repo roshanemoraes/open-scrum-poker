@@ -96,7 +96,9 @@ app.get('/api/auth/atlassian/callback', async (req, res) => {
       name: identity.name,
       accountId: identity.account_id,
     });
-    res.redirect(`/?hostToken=${encodeURIComponent(token)}`);
+    const params = new URLSearchParams({ hostToken: token });
+    if (identity.name) params.set('hostName', identity.name);
+    res.redirect(`/?${params.toString()}`);
   } catch (err) {
     res.redirect('/?atlassianError=login_failed');
   }
@@ -137,7 +139,7 @@ app.get('/api/rooms/:id/export', async (req, res) => {
   const room = await getRoom(req.params.id);
   if (!room) return res.status(404).json({ error: 'Room not found' });
 
-  const buffer = buildWorkbook(room);
+  const buffer = await buildWorkbook(room);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${room.name.replace(/[^a-z0-9\- _]/gi, '_')}.xlsx"`);
   res.send(buffer);

@@ -24,6 +24,29 @@ const ATLASSIAN_ERROR_MESSAGES = {
   login_failed: 'Atlassian login failed. Please try again.',
 };
 
+// Host tokens live in server memory only (see server/auth.js) — any server restart
+// invalidates them, forcing a re-login. For Atlassian login that's a full page
+// redirect, which would otherwise wipe the create-room form the host was filling in.
+// sessionStorage survives that round trip, so we stash a draft there.
+const DRAFT_KEY = 'osp_create_room_draft';
+
+function loadDraft() {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 // Cross-fades its children whenever fadeKey changes; skipped under prefers-reduced-motion.
 function FadeSwap({ fadeKey, children }) {
   const [visible, setVisible] = useState(false);
@@ -54,22 +77,24 @@ export default function Home() {
   const [hostToken, setHostTokenState] = useState(getHostToken());
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [newRoomName, setNewRoomName] = useState('Sprint Planning');
+
+  const initialDraft = useRef(loadDraft()).current;
+  const [newRoomName, setNewRoomName] = useState(initialDraft?.newRoomName ?? 'Sprint Planning');
   const [creating, setCreating] = useState(false);
 
-  const [rciEnabled, setRciEnabled] = useState(true);
-  const [rciPreset, setRciPreset] = useState('rci-scale');
-  const [rciCustomName, setRciCustomName] = useState('');
-  const [rciCustomValues, setRciCustomValues] = useState('');
+  const [rciEnabled, setRciEnabled] = useState(initialDraft?.rciEnabled ?? true);
+  const [rciPreset, setRciPreset] = useState(initialDraft?.rciPreset ?? 'rci-scale');
+  const [rciCustomName, setRciCustomName] = useState(initialDraft?.rciCustomName ?? '');
+  const [rciCustomValues, setRciCustomValues] = useState(initialDraft?.rciCustomValues ?? '');
 
-  const [effortEnabled, setEffortEnabled] = useState(true);
-  const [effortPreset, setEffortPreset] = useState('fibonacci');
-  const [effortCustomName, setEffortCustomName] = useState('');
-  const [effortCustomValues, setEffortCustomValues] = useState('');
+  const [effortEnabled, setEffortEnabled] = useState(initialDraft?.effortEnabled ?? true);
+  const [effortPreset, setEffortPreset] = useState(initialDraft?.effortPreset ?? 'fibonacci');
+  const [effortCustomName, setEffortCustomName] = useState(initialDraft?.effortCustomName ?? '');
+  const [effortCustomValues, setEffortCustomValues] = useState(initialDraft?.effortCustomValues ?? '');
 
-  const [optionsOpen, setOptionsOpen] = useState(true);
-  const [itemPrefix, setItemPrefix] = useState('');
-  const [hostCanVote, setHostCanVote] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(initialDraft?.optionsOpen ?? true);
+  const [itemPrefix, setItemPrefix] = useState(initialDraft?.itemPrefix ?? '');
+  const [hostCanVote, setHostCanVote] = useState(initialDraft?.hostCanVote ?? false);
 
   const [atlassianLoginEnabled, setAtlassianLoginEnabled] = useState(false);
 
@@ -87,11 +112,15 @@ export default function Home() {
   // Pick up the redirect back from /api/auth/atlassian/callback, then scrub the URL.
   useEffect(() => {
     const incomingToken = searchParams.get('hostToken');
+    const incomingName = searchParams.get('hostName');
     const atlassianError = searchParams.get('atlassianError');
 
     if (incomingToken) {
       setHostToken(incomingToken);
       setHostTokenState(incomingToken);
+      // Atlassian is authoritative about who's logging in — always take their real
+      // name over whatever name (possibly stale, from an earlier guest join) is cached.
+      if (incomingName) setName(incomingName);
       setTab('host');
     } else if (atlassianError) {
       setLoginError(ATLASSIAN_ERROR_MESSAGES[atlassianError] || 'Atlassian login failed.');
@@ -101,11 +130,31 @@ export default function Home() {
     if (incomingToken || atlassianError) {
       const url = new URL(window.location.href);
       url.searchParams.delete('hostToken');
+      url.searchParams.delete('hostName');
       url.searchParams.delete('atlassianError');
       window.history.replaceState({}, '', url.pathname + url.search);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep the create-room draft alive across a forced re-login (including the
+  // Atlassian full-page redirect round trip) — cleared once the room is actually created.
+  useEffect(() => {
+    const draft = {
+      newRoomName, rciEnabled, rciPreset, rciCustomName, rciCustomValues,
+      effortEnabled, effortPreset, effortCustomName, effortCustomValues,
+      optionsOpen, itemPrefix, hostCanVote,
+    };
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // ignore — draft persistence is a convenience, not required for correctness
+    }
+  }, [
+    newRoomName, rciEnabled, rciPreset, rciCustomName, rciCustomValues,
+    effortEnabled, effortPreset, effortCustomName, effortCustomValues,
+    optionsOpen, itemPrefix, hostCanVote,
+  ]);
 
   async function handleJoin(e) {
     e.preventDefault();
@@ -179,10 +228,18 @@ export default function Home() {
         },
       };
       const room = await createRoom(hostToken, newRoomName.trim(), config);
+      clearDraft();
       navigate(`/room/${room.id}`);
     } catch (err) {
-      if (err.message.includes('Host login')) handleLogout();
-      setLoginError(err.message);
+      if (err.message.includes('Host login')) {
+        // The server issues host tokens in memory only, so a restart (or a redeploy
+        // in production) invalidates them — this isn't a mistake the host made.
+        // The draft in sessionStorage survives the re-login, so nothing is lost.
+        handleLogout();
+        setLoginError('Your host session expired — please log in again. Your sprint setup was saved.');
+      } else {
+        setLoginError(err.message);
+      }
     } finally {
       setCreating(false);
     }
