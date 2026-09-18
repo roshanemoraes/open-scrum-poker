@@ -1,3 +1,9 @@
+export async function getAtlassianLoginConfig() {
+  const res = await fetch('/api/auth/atlassian/config');
+  if (!res.ok) return { enabled: false };
+  return res.json();
+}
+
 export async function hostLogin(password) {
   const res = await fetch('/api/host-login', {
     method: 'POST',

@@ -19,6 +19,34 @@ function authHeader() {
   return `Basic ${Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64')}`;
 }
 
+// Scoped API tokens (Atlassian's "API tokens with scopes") don't work against
+// <site>.atlassian.net at all — they only work through the API gateway at
+// api.atlassian.com/ex/jira/{cloudId}/..., which needs the site's cloudId resolved
+// first. Classic (unscoped) tokens also work fine through the gateway, so we route
+// every call through it unconditionally rather than branching on token type.
+let cloudIdPromise = null;
+
+function getCloudId() {
+  if (!cloudIdPromise) {
+    cloudIdPromise = fetch(`${JIRA_BASE_URL}/_edge/tenant_info`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Could not resolve Jira cloud id (${res.status})`);
+        return res.json();
+      })
+      .then((data) => data.cloudId)
+      .catch((err) => {
+        cloudIdPromise = null; // allow a retry on the next call instead of caching a failure
+        throw err;
+      });
+  }
+  return cloudIdPromise;
+}
+
+async function apiBase() {
+  const cloudId = await getCloudId();
+  return `https://api.atlassian.com/ex/jira/${cloudId}`;
+}
+
 // Field name -> id lookup is cached for the life of the process (cheap,
 // rarely changes) and refetched if a name isn't found, in case a field
 // was added/renamed on the Jira side after we started.
@@ -26,7 +54,7 @@ let fieldCache = null;
 
 async function getAllFields(forceRefresh = false) {
   if (fieldCache && !forceRefresh) return fieldCache;
-  const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/field`, {
+  const res = await fetch(`${await apiBase()}/rest/api/3/field`, {
     headers: { Authorization: authHeader(), Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`Jira field lookup failed (${res.status})`);
@@ -57,7 +85,7 @@ export async function pushFinalValue(issueKey, pollType, value) {
   const fieldName = pollType === 'rci' ? RCI_FIELD_NAME : STORY_POINTS_FIELD_NAME;
   const fieldId = await resolveFieldId(fieldName);
 
-  const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+  const res = await fetch(`${await apiBase()}/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
     method: 'PUT',
     headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ fields: { [fieldId]: numeric } }),
@@ -69,10 +97,33 @@ export async function pushFinalValue(issueKey, pollType, value) {
   }
 }
 
+// Best-effort attribution comment — the actual field write above always runs as the
+// service account, so this is how the "who really set this" audit trail is recorded
+// when ENABLE_JIRA_ATTRIBUTION_COMMENT is on. Callers should treat failures here as
+// non-fatal (the final value itself already synced successfully).
+export async function postAttributionComment(issueKey, text) {
+  const res = await fetch(`${await apiBase()}/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment`, {
+    method: 'POST',
+    headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      body: {
+        type: 'doc',
+        version: 1,
+        content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Jira rejected the comment (${res.status})${body ? `: ${body.slice(0, 200)}` : ''}`);
+  }
+}
+
 export async function fetchIssue(key) {
   const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64');
   const fields = 'summary,status,issuetype,priority,assignee,reporter,created,updated,description,comment';
-  const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/issue/${encodeURIComponent(key)}?fields=${fields}`, {
+  const res = await fetch(`${await apiBase()}/rest/api/3/issue/${encodeURIComponent(key)}?fields=${fields}`, {
     headers: {
       Authorization: `Basic ${auth}`,
       Accept: 'application/json',
