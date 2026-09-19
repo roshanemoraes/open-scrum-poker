@@ -2,6 +2,12 @@ export const getHostToken = () => localStorage.getItem('osp_host_token');
 export const setHostToken = (token) => localStorage.setItem('osp_host_token', token);
 export const clearHostToken = () => localStorage.removeItem('osp_host_token');
 
+// Only ever set when the host logged in via Atlassian (see Home.jsx's callback
+// handling) — used to show their real Atlassian identity instead of a typed name.
+export const getHostEmail = () => localStorage.getItem('osp_host_email');
+export const setHostEmail = (email) => localStorage.setItem('osp_host_email', email);
+export const clearHostEmail = () => localStorage.removeItem('osp_host_email');
+
 export const getName = () => localStorage.getItem('osp_name') || '';
 export const setName = (name) => localStorage.setItem('osp_name', name);
 

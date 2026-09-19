@@ -14,6 +14,12 @@ export async function hostLogin(password) {
   return res.json();
 }
 
+export async function checkHostSession(hostToken) {
+  const res = await fetch('/api/host-session', { headers: { 'x-host-token': hostToken } });
+  if (!res.ok) return false;
+  return (await res.json()).valid;
+}
+
 export async function createRoom(hostToken, name, config) {
   const res = await fetch('/api/rooms', {
     method: 'POST',

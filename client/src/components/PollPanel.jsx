@@ -4,7 +4,11 @@ import CardDeck from './CardDeck.jsx';
 import RippleButton from './RippleButton.jsx';
 import ProgressRing from './ProgressRing.jsx';
 import Confetti from './Confetti.jsx';
-import waitingForVotersImg from '../assets/illustrations/waiting-for-voters.png';
+import waitingForVotersImg from '../assets/illustrations/waiting-for-voters-with-text.svg';
+
+// Exact palette/typography from ManageSession.dc.html.
+const SPACE_GROTESK = { fontFamily: "'Space Grotesk', sans-serif" };
+const PLEX_SANS = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
 function computeConsensus(poll) {
   if (!poll?.revealed || !poll.votes) return null;
@@ -45,9 +49,9 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
 
   if (!poll) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm p-6 flex-1 min-w-0">
-        <h3 className="font-semibold text-slate-700 mb-3">{title}</h3>
-        <p className="text-slate-400 text-sm">No active item.</p>
+      <div className="bg-white border border-[#E4E1F2] rounded-[20px] p-[22px_24px_26px] shadow-[0_1px_2px_rgba(27,29,41,0.04)] flex-1 min-w-0" style={PLEX_SANS}>
+        <h3 className="text-[17px] font-semibold text-[#1B1D29] mb-3" style={SPACE_GROTESK}>{title}</h3>
+        <p className="text-[#6E6B85] text-sm">No active item.</p>
       </div>
     );
   }
@@ -57,11 +61,11 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
   const distinctValues = poll.revealed ? [...new Set(Object.values(poll.votes || {}))] : [];
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6 flex-1 min-w-0 flex flex-col gap-4">
+    <div className="bg-white border border-[#E4E1F2] rounded-[20px] p-[22px_24px_26px] shadow-[0_1px_2px_rgba(27,29,41,0.04)] flex-1 min-w-0 flex flex-col gap-4" style={PLEX_SANS}>
       <Confetti burstKey={burstKey} originRef={rowRef} />
 
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-slate-700">{title}</h3>
+        <h3 className="text-[17px] font-semibold text-[#1B1D29]" style={SPACE_GROTESK}>{title}</h3>
         {poll.final != null && (
           <span className="text-xs font-semibold bg-emerald-100 text-emerald-700 rounded-full px-2 py-1">
             Final: {poll.final}
@@ -87,7 +91,7 @@ export default function PollPanel({ title, deck, poll, participants, isHost, can
 
       {noVoters && (
         <div className="flex flex-col items-center justify-center py-4">
-          <img src={waitingForVotersImg} alt="Waiting for voters to join" className="w-70 h-auto" />
+          <img src={waitingForVotersImg} alt="Waiting for voters to join" className="w-60 h-auto" />
         </div>
       )}
 

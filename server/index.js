@@ -34,6 +34,7 @@ import {
   upsertParticipant,
   findParticipant,
   toPublicRoom,
+  updateConfig,
 } from './store.js';
 import { setPresence, clearPresence, entriesForRoom } from './presence.js';
 
@@ -58,6 +59,11 @@ app.post('/api/host-login', (req, res) => {
   const token = attemptHostLogin(password || '');
   if (!token) return res.status(401).json({ error: 'Invalid password' });
   res.json({ token });
+});
+
+app.get('/api/host-session', (req, res) => {
+  const hostToken = req.header('x-host-token');
+  res.json({ valid: isHostToken(hostToken) });
 });
 
 app.get('/api/auth/atlassian/config', (req, res) => {
@@ -98,6 +104,7 @@ app.get('/api/auth/atlassian/callback', async (req, res) => {
     });
     const params = new URLSearchParams({ hostToken: token });
     if (identity.name) params.set('hostName', identity.name);
+    if (identity.email) params.set('hostEmail', identity.email);
     res.redirect(`/?${params.toString()}`);
   } catch (err) {
     res.redirect('/?atlassianError=login_failed');
@@ -196,6 +203,13 @@ io.on('connection', (socket) => {
     await emitRoom(roomId);
   });
 
+  socket.on('set-observer', async ({ isObserver: nextObserver }) => {
+    const room = await getRoom(roomId);
+    if (!room || !participantId) return;
+    await upsertParticipant(room, { participantId, isObserver: !!nextObserver });
+    await emitRoom(roomId);
+  });
+
   async function requireHost() {
     const room = await getRoom(roomId);
     if (!room) return null;
@@ -210,6 +224,13 @@ io.on('connection', (socket) => {
     if (participant?.isObserver) return;
     if (!room.config.polls[pollType]?.deck.includes(value)) return;
     await vote(room, participantId, pollType, value);
+    await emitRoom(roomId);
+  });
+
+  socket.on('update-config', async ({ config }) => {
+    const room = await requireHost();
+    if (!room) return;
+    await updateConfig(room, config);
     await emitRoom(roomId);
   });
 

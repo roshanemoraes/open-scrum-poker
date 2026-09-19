@@ -5,6 +5,9 @@ import { socket } from '../lib/socket.js';
 import { exportUrl } from '../lib/api.js';
 import {
   getHostToken,
+  getHostEmail,
+  clearHostToken,
+  clearHostEmail,
   getName,
   setName,
   getParticipantId,
@@ -16,14 +19,41 @@ import Sidebar from '../components/Sidebar.jsx';
 import ItemsPanel from '../components/ItemsPanel.jsx';
 import ItemHeader from '../components/ItemHeader.jsx';
 import PollPanel from '../components/PollPanel.jsx';
+import Avatar from '../components/avatar/Avatar.jsx';
 import AvatarPicker from '../components/avatar/AvatarPicker.jsx';
-import SettingsMenu from '../components/SettingsMenu.jsx';
 import Toast from '../components/Toast.jsx';
+import UserMenu from '../components/UserMenu.jsx';
+import SessionSettingsModal from '../components/SessionSettingsModal.jsx';
 import { Logo } from '../components/Icons.jsx';
 import inviteLogo from '../assets/icons/invite.png';
 import manageItemsLogo from '../assets/icons/manage-items.png';
-import downloadLogo from '../assets/icons/download.png';
-import endSessionLogo from '../assets/icons/end-session.png';
+
+// Overlapping avatar stack showing who's currently in the room, with a "+N" bubble
+// for anyone past the first few.
+function ParticipantStack({ participants }) {
+  if (participants.length === 0) return null;
+  const MAX_SHOWN = 3;
+  const shown = participants.slice(0, MAX_SHOWN);
+  const extra = participants.length - shown.length;
+
+  return (
+    <div className="flex items-center">
+      {shown.map((p, i) => (
+        <div key={p.id} className="rounded-full ring-2 ring-white" style={{ marginLeft: i === 0 ? 0 : -10 }}>
+          <Avatar id={p.id} avatarId={p.avatarId} name={p.name} size={32} />
+        </div>
+      ))}
+      {extra > 0 && (
+        <div
+          className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 text-xs font-semibold flex items-center justify-center ring-2 ring-white"
+          style={{ marginLeft: -10 }}
+        >
+          +{extra}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Room() {
   const { roomId } = useParams();
@@ -39,6 +69,7 @@ export default function Room() {
   const [room, setRoom] = useState(null);
   const [copied, setCopied] = useState(false);
   const [manageItems, setManageItems] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [addingItem, setAddingItem] = useState(false);
   const hostToken = useRef(getHostToken());
@@ -146,6 +177,22 @@ export default function Room() {
     socket.emit('end-session');
   }
 
+  function handleSignOut() {
+    socket.disconnect();
+    clearHostToken();
+    clearHostEmail();
+    navigate('/');
+  }
+
+  function toggleObserver(next) {
+    socket.emit('set-observer', { isObserver: next });
+  }
+
+  function saveSessionSettings(config) {
+    socket.emit('update-config', { config });
+    setSettingsOpen(false);
+  }
+
   if (needsProfile) {
     const canContinue = !!nameDraft.trim() && avatarDraft != null;
     return (
@@ -203,19 +250,31 @@ export default function Room() {
     return <div className="min-h-screen flex items-center justify-center text-slate-400">Connecting…</div>;
   }
 
-  const canVote = !isSelfObserver(room);
+  const me = room.participants.find((p) => p.id === getParticipantId(room.id));
+  const canVote = !me?.isObserver;
   const pollTypes = Object.keys(room.config?.polls || {});
   const bothFinalsSet = !room.currentItem || pollTypes.every((type) => room.currentItem[type]?.final != null);
 
+  // Prefer the Atlassian identity (only ever set for a host who logged in that way);
+  // everyone else — guests, and hosts on the plain password flow — shows their typed name.
+  const myIdentity = (isHost && getHostEmail()) || getName();
+
   return (
-    <div className="min-h-screen p-4 md:p-6">
+    <div className="min-h-screen">
       {toast && (
         <div className="fixed top-4 right-4 z-[1000]">
           <Toast type={toast.type} title={toast.title} message={toast.message} onClose={() => setToast(null)} />
         </div>
       )}
 
-      <header className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-5 py-3 mb-4 gap-4">
+      <SessionSettingsModal
+        open={settingsOpen}
+        config={room.config}
+        onClose={() => setSettingsOpen(false)}
+        onSave={saveSessionSettings}
+      />
+
+      <header className="flex items-center justify-between bg-white shadow-sm px-4 md:px-6 py-3 gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <Logo />
           <div className="min-w-0">
@@ -225,40 +284,35 @@ export default function Room() {
             <h1 className="font-bold text-slate-800 truncate leading-tight">{room.name}</h1>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
+          <ParticipantStack participants={room.participants} />
+          <div className="w-px h-6 bg-slate-200" />
           <button
             onClick={copyShareLink}
-            className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-2"
+            className="flex items-center gap-1.5 text-sm font-semibold border-2 border-violet-600 text-violet-700 bg-white hover:bg-violet-50 rounded-lg px-4 py-2 transition-colors"
           >
-            <img src={inviteLogo} alt="Invite" className="w-5 h-5 shrink-0" /> {copied ? 'Copied!' : 'Invite Others'}
+            <img src={inviteLogo} alt="Invite" className="w-5 h-5 shrink-0" /> {copied ? 'Copied!' : 'Invite others'}
           </button>
           {isHost && (
             <button
               onClick={() => setManageItems((v) => !v)}
-              className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg px-3 py-2"
+              className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg px-3 py-2 transition-colors"
             >
-              <img src={manageItemsLogo} alt="Manage Items" className="w-5 h-5 shrink-0" /> {manageItems ? 'Close Item Setup' : 'Manage Items'}
+              <img src={manageItemsLogo} alt="" className="w-5 h-5 shrink-0" /> {manageItems ? 'Close session setup' : 'Manage session'}
             </button>
           )}
-          {isHost && (
-            <SettingsMenu
-              items={[
-                { label: 'Download Excel', icon: <img src={downloadLogo} alt="Download" className="w-4 h-4" />, onClick: downloadExcel },
-              ]}
-            />
-          )}
-          {isHost && (
-            <button
-              onClick={endSession}
-              className="flex items-center gap-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 rounded-lg px-3 py-2"
-            >
-              <img src={endSessionLogo} alt="End Session" className="w-5 h-5 shrink-0" /> End Session
-            </button>
-          )}
+          <UserMenu
+            name={getName() || myIdentity}
+            email={isHost ? getHostEmail() : ''}
+            isObserver={!!me?.isObserver}
+            onToggleObserver={toggleObserver}
+            showObserverToggle
+            onSignOut={handleSignOut}
+          />
         </div>
       </header>
 
-      <div className="flex flex-col lg:flex-row gap-4">
+      <div className="p-4 md:p-6 flex flex-col lg:flex-row gap-4">
         <Sidebar
           participants={room.participants}
           currentItem={room.currentItem}
@@ -287,6 +341,9 @@ export default function Room() {
               onRemove={(itemId) => socket.emit('remove-item', { itemId })}
               onPrev={() => socket.emit('set-current-item', { index: room.currentItemIndex - 1 })}
               onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
+              onDownloadExcel={downloadExcel}
+              onEndSession={endSession}
+              onSettings={() => setSettingsOpen(true)}
               canNavigate={bothFinalsSet}
             />
           ) : (
@@ -297,35 +354,32 @@ export default function Room() {
               isHost={isHost}
               onPrev={() => socket.emit('set-current-item', { index: room.currentItemIndex - 1 })}
               onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
+              onManageItems={() => setManageItems(true)}
               canNavigate={bothFinalsSet}
             />
           )}
 
-          <div className="flex flex-col md:flex-row gap-4">
-            {pollTypes.map((type) => (
-              <PollPanel
-                key={type}
-                title={room.config.polls[type].label}
-                deck={room.config.polls[type].deck}
-                poll={room.currentItem?.[type]}
-                participants={room.participants}
-                isHost={isHost}
-                canVote={canVote && !!room.currentItem}
-                onVote={(value) => socket.emit('vote', { pollType: type, value })}
-                onReveal={() => socket.emit('reveal', { pollType: type })}
-                onReset={() => socket.emit('reset-poll', { pollType: type })}
-                onSetFinal={(value) => socket.emit('set-final', { pollType: type, value })}
-              />
-            ))}
-          </div>
+          {room.currentItem && !manageItems && (
+            <div className="flex flex-col md:flex-row gap-4">
+              {pollTypes.map((type) => (
+                <PollPanel
+                  key={type}
+                  title={room.config.polls[type].label}
+                  deck={room.config.polls[type].deck}
+                  poll={room.currentItem?.[type]}
+                  participants={room.participants}
+                  isHost={isHost}
+                  canVote={canVote && !!room.currentItem}
+                  onVote={(value) => socket.emit('vote', { pollType: type, value })}
+                  onReveal={() => socket.emit('reveal', { pollType: type })}
+                  onReset={() => socket.emit('reset-poll', { pollType: type })}
+                  onSetFinal={(value) => socket.emit('set-final', { pollType: type, value })}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
-}
-
-function isSelfObserver(room) {
-  const pid = getParticipantId(room.id);
-  const me = room.participants.find((p) => p.id === pid);
-  return !!me?.isObserver;
 }

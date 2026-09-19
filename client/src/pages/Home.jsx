@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { hostLogin, createRoom, roomExists, getAtlassianLoginConfig } from '../lib/api.js';
-import { getHostToken, setHostToken, clearHostToken, getName, setName } from '../lib/storage.js';
+import { hostLogin, createRoom, roomExists, getAtlassianLoginConfig, checkHostSession } from '../lib/api.js';
+import { getHostToken, setHostToken, clearHostToken, setHostEmail, clearHostEmail, getName, setName } from '../lib/storage.js';
 import { Logo } from '../components/Icons.jsx';
 import PollConfigField from '../components/PollConfigField.jsx';
 import Switch from '../components/Switch.jsx';
@@ -113,6 +113,7 @@ export default function Home() {
   useEffect(() => {
     const incomingToken = searchParams.get('hostToken');
     const incomingName = searchParams.get('hostName');
+    const incomingEmail = searchParams.get('hostEmail');
     const atlassianError = searchParams.get('atlassianError');
 
     if (incomingToken) {
@@ -121,6 +122,8 @@ export default function Home() {
       // Atlassian is authoritative about who's logging in — always take their real
       // name over whatever name (possibly stale, from an earlier guest join) is cached.
       if (incomingName) setName(incomingName);
+      if (incomingEmail) setHostEmail(incomingEmail);
+      else clearHostEmail();
       setTab('host');
     } else if (atlassianError) {
       setLoginError(ATLASSIAN_ERROR_MESSAGES[atlassianError] || 'Atlassian login failed.');
@@ -131,11 +134,31 @@ export default function Home() {
       const url = new URL(window.location.href);
       url.searchParams.delete('hostToken');
       url.searchParams.delete('hostName');
+      url.searchParams.delete('hostEmail');
       url.searchParams.delete('atlassianError');
       window.history.replaceState({}, '', url.pathname + url.search);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Host tokens live in server memory only, so a server restart silently invalidates
+  // whatever token was cached in localStorage from a previous session — without this
+  // check the UI would keep showing "Logged in as scheduler" until the host tried to
+  // create a room and hit a confusing failure. Re-check whenever we (re)acquire a token.
+  useEffect(() => {
+    if (!hostToken) return;
+    let cancelled = false;
+    checkHostSession(hostToken).then((valid) => {
+      if (cancelled || valid) return;
+      clearHostToken();
+      clearHostEmail();
+      setHostTokenState(null);
+      setLoginError('Your host session expired — please log in again. Your sprint setup was saved.');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hostToken]);
 
   // Keep the create-room draft alive across a forced re-login (including the
   // Atlassian full-page redirect round trip) — cleared once the room is actually created.
@@ -184,6 +207,7 @@ export default function Home() {
 
   function handleLogout() {
     clearHostToken();
+    clearHostEmail();
     setHostTokenState(null);
   }
 
