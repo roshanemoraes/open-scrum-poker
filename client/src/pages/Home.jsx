@@ -79,6 +79,7 @@ export default function Home() {
   const [loginError, setLoginError] = useState('');
 
   const initialDraft = useRef(loadDraft()).current;
+  const [hostName, setHostName] = useState(initialDraft?.hostName ?? getName());
   const [newRoomName, setNewRoomName] = useState(initialDraft?.newRoomName ?? 'Sprint Planning');
   const [creating, setCreating] = useState(false);
 
@@ -164,7 +165,7 @@ export default function Home() {
   // Atlassian full-page redirect round trip) — cleared once the room is actually created.
   useEffect(() => {
     const draft = {
-      newRoomName, rciEnabled, rciPreset, rciCustomName, rciCustomValues,
+      hostName, newRoomName, rciEnabled, rciPreset, rciCustomName, rciCustomValues,
       effortEnabled, effortPreset, effortCustomName, effortCustomValues,
       optionsOpen, itemPrefix, hostCanVote,
     };
@@ -174,7 +175,7 @@ export default function Home() {
       // ignore — draft persistence is a convenience, not required for correctness
     }
   }, [
-    newRoomName, rciEnabled, rciPreset, rciCustomName, rciCustomValues,
+    hostName, newRoomName, rciEnabled, rciPreset, rciCustomName, rciCustomValues,
     effortEnabled, effortPreset, effortCustomName, effortCustomValues,
     optionsOpen, itemPrefix, hostCanVote,
   ]);
@@ -227,6 +228,10 @@ export default function Home() {
   async function handleCreateRoom(e) {
     e.preventDefault();
     if (!hostToken || !newRoomName.trim()) return;
+    if (!atlassianLoginEnabled && !hostName.trim()) {
+      setLoginError('Enter your name.');
+      return;
+    }
     if (!rciEnabled && !effortEnabled) {
       setLoginError('Enable at least one voting table.');
       return;
@@ -243,6 +248,7 @@ export default function Home() {
     setLoginError('');
     setCreating(true);
     try {
+      if (!atlassianLoginEnabled) setName(hostName.trim());
       const config = {
         itemPrefix: itemPrefix.trim(),
         hostCanVote,
@@ -390,6 +396,14 @@ export default function Home() {
                   ) : (
                     <form onSubmit={handleCreateRoom} className="flex flex-col gap-3">
                       <p className="text-sm text-emerald-600">Logged in as scheduler</p>
+                      {!atlassianLoginEnabled && (
+                        <input
+                          className={inputBase}
+                          placeholder="Your name"
+                          value={hostName}
+                          onChange={(e) => setHostName(e.target.value)}
+                        />
+                      )}
                       <input
                         className={inputBase}
                         placeholder="Sprint name"

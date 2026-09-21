@@ -25,8 +25,28 @@ import Toast from '../components/Toast.jsx';
 import UserMenu from '../components/UserMenu.jsx';
 import SessionSettingsModal from '../components/SessionSettingsModal.jsx';
 import { Logo } from '../components/Icons.jsx';
-import inviteLogo from '../assets/icons/invite.png';
-import manageItemsLogo from '../assets/icons/manage-items.png';
+
+// stroke="currentColor" so each icon always matches its own button's text color
+// (see improve.txt #3) instead of carrying a hardcoded PNG tint.
+function InviteIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
+      <circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M1.5 13.5c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M12.5 4.5v4M10.5 6.5h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ManageSessionIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M1.5 6.5h13" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M5 6.5v7" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
 
 // Overlapping avatar stack showing who's currently in the room, with a "+N" bubble
 // for anyone past the first few.
@@ -287,18 +307,15 @@ export default function Room() {
         <div className="flex items-center gap-3 shrink-0">
           <ParticipantStack participants={room.participants} />
           <div className="w-px h-6 bg-slate-200" />
-          <button
-            onClick={copyShareLink}
-            className="flex items-center gap-1.5 text-sm font-semibold border-2 border-violet-600 text-violet-700 bg-white hover:bg-violet-50 rounded-lg px-4 py-2 transition-colors"
-          >
-            <img src={inviteLogo} alt="Invite" className="w-5 h-5 shrink-0" /> {copied ? 'Copied!' : 'Invite others'}
+          <button onClick={copyShareLink} className="btn-primary">
+            <InviteIcon /> {copied ? 'Copied!' : 'Invite others'}
           </button>
           {isHost && (
             <button
               onClick={() => setManageItems((v) => !v)}
-              className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg px-3 py-2 transition-colors"
+              className="btn-secondary"
             >
-              <img src={manageItemsLogo} alt="" className="w-5 h-5 shrink-0" /> {manageItems ? 'Close session setup' : 'Manage session'}
+              <ManageSessionIcon /> {manageItems ? 'Close session setup' : 'Manage session'}
             </button>
           )}
           <UserMenu
