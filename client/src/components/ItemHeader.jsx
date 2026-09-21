@@ -49,10 +49,7 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
             : 'Waiting for the host to add the first item.'}
         </p>
         {isHost && (
-          <button
-            onClick={onManageItems}
-            className="mt-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg px-5 py-2.5 transition-colors"
-          >
+          <button onClick={onManageItems} className="btn-primary mt-3">
             Add an item to estimate
           </button>
         )}
@@ -79,14 +76,14 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
       <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={() => setDrawerOpen(true)}
-          className="shrink-0 flex items-center gap-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-1.5"
+          className="shrink-0 flex items-center gap-1.5 text-xs font-medium bg-[#F5F4FB] hover:bg-[#EFEDFC] text-[#4A4763] rounded-lg px-3 py-1.5"
         >
           <img src={viewLogo} alt="" className="w-5 h-5 shrink-0" />
           View
         </button>
         <button
           onClick={openInJira}
-          className="shrink-0 flex items-center gap-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg px-3 py-1.5"
+          className="shrink-0 flex items-center gap-1.5 text-xs font-medium bg-[#F5F4FB] hover:bg-[#EFEDFC] text-[#4A4763] rounded-lg px-3 py-1.5"
         >
           {/* <ExternalLinkIcon width={14} height={14} /> */}
           <img src={openExternalLogo} alt="" className="w-5 h-5 shrink-0" />

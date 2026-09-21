@@ -79,6 +79,10 @@ export async function upsertParticipant(room, participant) {
   logic.upsertParticipant(room, participant);
 }
 
+export async function updateConfig(room, config) {
+  logic.updateConfig(room, config);
+}
+
 export async function findParticipant(room, participantId) {
   return logic.findParticipant(room, participantId);
 }
