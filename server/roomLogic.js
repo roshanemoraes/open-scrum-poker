@@ -29,6 +29,10 @@ export function normalizeConfig(config) {
   };
 }
 
+export function updateConfig(room, config) {
+  room.config = normalizeConfig(config);
+}
+
 export function enabledPollTypes(room) {
   return Object.keys(room.config.polls);
 }

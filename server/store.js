@@ -26,4 +26,5 @@ export const {
   upsertParticipant,
   findParticipant,
   toPublicRoom,
+  updateConfig,
 } = impl;
