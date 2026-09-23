@@ -261,6 +261,9 @@ io.on('connection', (socket) => {
     await setFinal(room, pollType, value);
     await emitRoom(roomId);
 
+    // Clearing the final (host clicked "Change") isn't a value to sync — Number(null)
+    // is 0, so without this guard we'd push a bogus 0 to the linked Jira field.
+    if (value == null) return;
     if (!isJiraConfigured()) return;
     const item = await currentItem(room);
     if (!item) return;
