@@ -15,17 +15,20 @@ function truncateTitle(title) {
 
 export default function ItemHeader({ item, index, total, isHost, onNext, onManageItems, canNavigate = true }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [title, setTitle] = useState(null);
+  const [titleState, setTitleState] = useState({ loading: false, title: null });
 
   useEffect(() => {
-    setTitle(null);
-    if (!item) return;
+    if (!item) {
+      setTitleState({ loading: false, title: null });
+      return;
+    }
     let cancelled = false;
+    setTitleState({ loading: true, title: null });
 
     fetch(`/api/jira/${encodeURIComponent(item.name)}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => !cancelled && setTitle(data?.summary || null))
-      .catch(() => !cancelled && setTitle(null));
+      .then((data) => !cancelled && setTitleState({ loading: false, title: data?.summary || null }))
+      .catch(() => !cancelled && setTitleState({ loading: false, title: null }));
 
     return () => {
       cancelled = true;
@@ -67,9 +70,12 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
     <div className="bg-white border border-[#E4E1F2] rounded-[20px] shadow-[0_1px_2px_rgba(27,29,41,0.04)] p-4 flex items-center justify-between gap-2">
       <div className="flex-1 min-w-0 flex items-center justify-start gap-3">
         <img src={jiraLogo} alt="Jira" className="w-5 h-5 shrink-0" />
-        <h2 className="text-lg font-semibold text-slate-700 truncate" title={title || undefined}>
-          {item.name}
-          {title && <span className="font-semibold text-slate-700">: {truncateTitle(title)}</span>}
+        <h2 className="text-lg font-semibold text-slate-700 truncate flex items-center gap-2" title={titleState.title || undefined}>
+          <span>{item.name}</span>
+          {titleState.loading && <span className="jira-drawer-skel inline-block w-40 h-5 shrink-0" />}
+          {!titleState.loading && titleState.title && (
+            <span className="font-semibold text-slate-700 truncate">: {truncateTitle(titleState.title)}</span>
+          )}
         </h2>
       </div>
 
