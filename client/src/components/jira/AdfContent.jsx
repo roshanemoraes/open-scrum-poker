@@ -25,7 +25,7 @@ function renderMarks(text, marks, key) {
         break;
       case 'link':
         node = (
-          <a key={key} href={mark.attrs?.href} target="_blank" rel="noreferrer" className="text-violet-600 underline">
+          <a key={key} href={mark.attrs?.href} target="_blank" rel="noreferrer" className="underline" style={{ color: 'var(--accent)' }}>
             {node}
           </a>
         );
@@ -41,7 +41,7 @@ function renderInline(nodes) {
   return (nodes || []).map((node, i) => {
     if (node.type === 'text') return <span key={i}>{renderMarks(node.text, node.marks, i)}</span>;
     if (node.type === 'hardBreak') return <br key={i} />;
-    if (node.type === 'mention') return <span key={i} className="text-violet-600 font-medium">@{node.attrs?.text}</span>;
+    if (node.type === 'mention') return <span key={i} className="font-medium" style={{ color: 'var(--accent)' }}>@{node.attrs?.text}</span>;
     if (node.type === 'emoji') return <span key={i}>{node.attrs?.text || ''}</span>;
     return null;
   });
@@ -72,19 +72,19 @@ function AdfNode({ node, index }) {
       return <>{(node.content || []).map((n, i) => <AdfNode key={i} node={n} index={i} />)}</>;
 
     case 'paragraph':
-      return <p className="text-sm text-slate-700 leading-relaxed">{renderInline(node.content)}</p>;
+      return <p className="text-[14.5px] leading-[1.65]" style={{ color: '#33364A' }}>{renderInline(node.content)}</p>;
 
     case 'heading': {
       const level = Math.min(Math.max(node.attrs?.level || 3, 1), 6);
       const Tag = `h${level}`;
-      return <Tag className="font-semibold text-slate-800 mt-2">{renderInline(node.content)}</Tag>;
+      return <Tag className="font-bold mt-2" style={{ color: '#1E2130' }}>{renderInline(node.content)}</Tag>;
     }
 
     case 'bulletList': {
       const resolved = resolveList(node);
       if (resolved.type === 'orderedList') return <AdfNode node={resolved} />;
       return (
-        <ul className="list-disc pl-5 space-y-1 marker:text-slate-400">
+        <ul className="list-disc pl-11 mb-[22px] marker:text-[#9CA0AE]">
           {(resolved.content || []).map((n, i) => <AdfNode key={i} node={n} index={i} />)}
         </ul>
       );
@@ -102,7 +102,7 @@ function AdfNode({ node, index }) {
 
     case 'listItem':
       return (
-        <li className="text-sm text-slate-700">
+        <li className="text-[14.5px] leading-[1.65] mb-2" style={{ color: '#33364A' }}>
           {(node.content || []).map((n, i) => <AdfNode key={i} node={n} index={i} />)}
         </li>
       );

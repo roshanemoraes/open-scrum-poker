@@ -1,3 +1,16 @@
+// The server (or a proxy in front of it) doesn't always fail with a JSON body —
+// a crashed/unreachable backend can return an HTML error page instead, which makes
+// res.json() throw "Unexpected token '<' ... is not valid JSON". Fall back to a
+// generic message in that case instead of surfacing the parse error to the user.
+async function readErrorMessage(res, fallback) {
+  try {
+    const data = await res.json();
+    return data?.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function getAtlassianLoginConfig() {
   const res = await fetch('/api/auth/atlassian/config');
   if (!res.ok) return { enabled: false };
@@ -10,7 +23,7 @@ export async function hostLogin(password) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password }),
   });
-  if (!res.ok) throw new Error((await res.json()).error || 'Login failed');
+  if (!res.ok) throw new Error(await readErrorMessage(res, 'Login failed'));
   return res.json();
 }
 
@@ -26,7 +39,7 @@ export async function createRoom(hostToken, name, config) {
     headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
     body: JSON.stringify({ name, config }),
   });
-  if (!res.ok) throw new Error((await res.json()).error || 'Could not create room');
+  if (!res.ok) throw new Error(await readErrorMessage(res, 'Could not create room'));
   return res.json();
 }
 
