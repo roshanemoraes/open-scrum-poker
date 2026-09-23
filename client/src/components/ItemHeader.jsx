@@ -74,18 +74,11 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className="shrink-0 flex items-center gap-1.5 text-xs font-medium bg-[#F5F4FB] hover:bg-[#EFEDFC] text-[#4A4763] rounded-lg px-3 py-1.5"
-        >
+        <button onClick={() => setDrawerOpen(true)} className="btn-secondary shrink-0">
           <img src={viewLogo} alt="" className="w-5 h-5 shrink-0" />
           View
         </button>
-        <button
-          onClick={openInJira}
-          className="shrink-0 flex items-center gap-1.5 text-xs font-medium bg-[#F5F4FB] hover:bg-[#EFEDFC] text-[#4A4763] rounded-lg px-3 py-1.5"
-        >
-          {/* <ExternalLinkIcon width={14} height={14} /> */}
+        <button onClick={openInJira} className="btn-secondary shrink-0">
           <img src={openExternalLogo} alt="" className="w-5 h-5 shrink-0" />
           Open in Jira
         </button>
@@ -96,7 +89,7 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
           onClick={onNext}
           disabled={index >= total - 1 || !canNavigate}
           title={!canNavigate ? 'Set final values for this item before moving on' : undefined}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-30 shrink-0"
+          className="btn-primary shrink-0 disabled:opacity-30"
         >
           Next <img src={chevronRightLogo} alt="" className="w-5 h-5 shrink-0" />
         </button>
