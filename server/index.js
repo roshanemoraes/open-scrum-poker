@@ -6,13 +6,20 @@ import { createServer } from 'node:http';
 import { Server } from 'socket.io';
 import { nanoid } from 'nanoid';
 
-import { attemptHostLogin, issueHostToken, isHostToken, getHostSession } from './auth.js';
+import {
+  attemptHostLogin,
+  issueHostToken,
+  isHostToken,
+  getHostSession,
+  hostHasJiraWriteAccess,
+  getJiraWriteAccessToken,
+} from './auth.js';
 import {
   isAtlassianLoginEnabled,
   createState,
   consumeState,
   buildAuthorizeUrl,
-  exchangeCodeForAccessToken,
+  exchangeCodeForTokens,
   fetchAtlassianIdentity,
   isAuthorizedIdentity,
 } from './atlassianAuth.js';
@@ -22,6 +29,7 @@ import {
   deleteRoom,
   roomExists,
   addItem,
+  importItems,
   removeItem,
   setCurrentItemIndex,
   canLeaveCurrentItem,
@@ -73,8 +81,9 @@ app.get('/api/auth/atlassian/config', (req, res) => {
 app.get('/api/auth/atlassian/login', (req, res) => {
   if (!isAtlassianLoginEnabled()) return res.status(404).end();
   try {
-    const state = createState();
-    res.redirect(buildAuthorizeUrl(state));
+    const wantsWrite = req.query.write === '1';
+    const state = createState(wantsWrite);
+    res.redirect(buildAuthorizeUrl(state, wantsWrite));
   } catch (err) {
     res.status(500).send('Atlassian login is not configured correctly on the server.');
   }
@@ -84,13 +93,14 @@ app.get('/api/auth/atlassian/callback', async (req, res) => {
   if (!isAtlassianLoginEnabled()) return res.status(404).end();
   const { code, state } = req.query;
 
-  if (!consumeState(state)) {
+  const consumed = consumeState(state);
+  if (!consumed) {
     return res.redirect('/?atlassianError=invalid_state');
   }
 
   try {
-    const accessToken = await exchangeCodeForAccessToken(code);
-    const identity = await fetchAtlassianIdentity(accessToken);
+    const tokens = await exchangeCodeForTokens(code);
+    const identity = await fetchAtlassianIdentity(tokens.accessToken);
 
     if (!isAuthorizedIdentity(identity)) {
       return res.redirect('/?atlassianError=unauthorized');
@@ -101,6 +111,8 @@ app.get('/api/auth/atlassian/callback', async (req, res) => {
       email: identity.email,
       name: identity.name,
       accountId: identity.account_id,
+      jira: tokens,
+      jiraWriteEnabled: consumed.wantsWrite,
     });
     const params = new URLSearchParams({ hostToken: token });
     if (identity.name) params.set('hostName', identity.name);
@@ -268,15 +280,46 @@ io.on('connection', (socket) => {
     const item = await currentItem(room);
     if (!item) return;
 
+    // Atlassian login on: write as the host using their own OAuth token — unless this
+    // session deliberately only requested read access, in which case skip the sync
+    // rather than attempt a write with a token that was never granted write:jira-work.
+    // Atlassian login off (or a password-login host): writeAuth stays undefined and
+    // jira.js falls back to the shared token.
+    let writeAuth;
+    if (isAtlassianLoginEnabled()) {
+      if (!hostHasJiraWriteAccess(hostSessionToken)) {
+        io.to(roomId).emit('jira-sync', {
+          itemName: item.name,
+          pollType,
+          skipped: true,
+          message: 'Not synced to Jira — this session has read-only access.',
+        });
+        return;
+      }
+      const accessToken = await getJiraWriteAccessToken(hostSessionToken);
+      if (!accessToken) {
+        io.to(roomId).emit('jira-sync', {
+          itemName: item.name,
+          pollType,
+          ok: false,
+          error: 'Your Atlassian session expired — log in again to sync to Jira',
+        });
+        return;
+      }
+      writeAuth = `Bearer ${accessToken}`;
+    }
+
     try {
-      await pushFinalValue(item.name, pollType, value);
+      await pushFinalValue(item.name, pollType, value, writeAuth);
       io.to(roomId).emit('jira-sync', { itemName: item.name, pollType, ok: true });
     } catch (err) {
       io.to(roomId).emit('jira-sync', { itemName: item.name, pollType, ok: false, error: err.message });
       return;
     }
 
-    if (!ENABLE_JIRA_ATTRIBUTION_COMMENT) return;
+    // With the host's own token Jira's changelog already names them, so the comment is
+    // only useful when the write went through the shared account.
+    if (writeAuth || !ENABLE_JIRA_ATTRIBUTION_COMMENT) return;
     const hostSession = getHostSession(hostSessionToken);
     const participant = await findParticipant(room, participantId);
     const actorLabel = hostSession?.email || participant?.name || 'the host';
@@ -313,6 +356,19 @@ io.on('connection', (socket) => {
     }
 
     await addItem(room, trimmed);
+    await emitRoom(roomId);
+  });
+
+  // Bulk-add items from a parsed CSV (client parses the file; this just persists the
+  // rows). No Jira verification here by design — the whole point of importing is to
+  // work when Jira isn't connected, and even when it is, imported items are trusted
+  // as-is rather than round-tripped through a live lookup per row.
+  socket.on('import-items', async ({ items }) => {
+    const room = await requireHost();
+    if (!room || !Array.isArray(items) || items.length === 0) return;
+
+    const result = await importItems(room, items);
+    socket.emit('import-items-result', result);
     await emitRoom(roomId);
   });
 

@@ -14,6 +14,24 @@ function DownloadIcon() {
   );
 }
 
+function ImportIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <path d="M7.5 9.5v-8M4.5 4.5l3-3 3 3" stroke="#4A4763" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 11v1.5A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V11" stroke="#4A4763" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ImportedBadgeIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 15 15" fill="none" className="shrink-0" title="Imported from CSV">
+      <path d="M7.5 9.5v-8M4.5 4.5l3-3 3 3" stroke="#8983B0" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 11v1.5A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V11" stroke="#8983B0" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function SettingsIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 18 18" fill="none">
@@ -73,6 +91,7 @@ export default function ItemsPanel({
   onDownloadExcel,
   onEndSession,
   onSettings,
+  onImportItems,
   canNavigate = true,
 }) {
   const [newNumber, setNewNumber] = useState('');
@@ -118,6 +137,12 @@ export default function ItemsPanel({
       <div className="flex items-center justify-between pb-[18px] mb-5 border-b border-[#E4E1F2]">
         <span className="text-[19px] font-bold text-[#1B1D29]" style={SPACE_GROTESK}>Manage session</span>
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={onImportItems}
+            className="flex items-center gap-[7px] px-[14px] py-2 rounded-[9px] bg-transparent text-[#4A4763] text-[13.5px] font-semibold hover:bg-[#F5F4FB] transition-colors"
+          >
+            <ImportIcon /> Import Items
+          </button>
           <button
             onClick={onSettings}
             className="flex items-center gap-[7px] px-[14px] py-2 rounded-[9px] bg-transparent text-[#4A4763] text-[13.5px] font-semibold hover:bg-[#F5F4FB] transition-colors"
@@ -189,8 +214,9 @@ export default function ItemsPanel({
               ].join(' ')}
               onClick={() => !locked && onSelect(idx)}
             >
-              <span className={['truncate text-[14.5px]', isCurrent ? 'font-semibold text-[#4038B8]' : 'font-medium text-[#4A4763]'].join(' ')}>
+              <span className={['flex items-center gap-1.5 min-w-0 truncate text-[14.5px]', isCurrent ? 'font-semibold text-[#4038B8]' : 'font-medium text-[#4A4763]'].join(' ')}>
                 {idx + 1}. {item.name}
+                {item.source === 'import' && <ImportedBadgeIcon />}
               </span>
               {isHost && (
                 <button

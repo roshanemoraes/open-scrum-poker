@@ -24,6 +24,7 @@ import AvatarPicker from '../components/avatar/AvatarPicker.jsx';
 import Toast from '../components/Toast.jsx';
 import UserMenu from '../components/UserMenu.jsx';
 import SessionSettingsModal from '../components/SessionSettingsModal.jsx';
+import ImportItemsModal from '../components/ImportItemsModal.jsx';
 import { Logo } from '../components/Icons.jsx';
 
 // stroke="currentColor" so each icon always matches its own button's text color
@@ -90,6 +91,7 @@ export default function Room() {
   const [copied, setCopied] = useState(false);
   const [manageItems, setManageItems] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [addingItem, setAddingItem] = useState(false);
   const hostToken = useRef(getHostToken());
@@ -137,6 +139,10 @@ export default function Room() {
     }
     socket.on('jira-sync', (payload) => {
       const label = payload.pollType === 'rci' ? 'RCI' : 'Effort';
+      if (payload.skipped) {
+        showToast({ type: 'info', title: 'Not synced', message: payload.message || `${label} wasn't synced to Jira.` });
+        return;
+      }
       showToast(
         payload.ok
           ? { type: 'success', title: 'Synced!', message: `${label} synced to ${payload.itemName} in Jira` }
@@ -146,6 +152,10 @@ export default function Room() {
     socket.on('add-item-error', ({ error }) => {
       showToast({ type: 'error', title: 'Error', message: error });
       processAddItemQueue();
+    });
+    socket.on('import-items-result', ({ added, skipped }) => {
+      const skippedNote = skipped.length > 0 ? ` (${skipped.length} skipped — already in this sprint)` : '';
+      showToast({ type: 'success', title: 'Import complete', message: `Added ${added.length} item${added.length === 1 ? '' : 's'}${skippedNote}` });
     });
 
     function processAddItemQueue() {
@@ -167,6 +177,7 @@ export default function Room() {
       socket.off('session-ended');
       socket.off('jira-sync');
       socket.off('add-item-error');
+      socket.off('import-items-result');
       socket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,6 +222,10 @@ export default function Room() {
   function saveSessionSettings(config) {
     socket.emit('update-config', { config });
     setSettingsOpen(false);
+  }
+
+  function importItems(items) {
+    socket.emit('import-items', { items });
   }
 
   if (needsProfile) {
@@ -294,6 +309,12 @@ export default function Room() {
         onSave={saveSessionSettings}
       />
 
+      <ImportItemsModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={importItems}
+      />
+
       <header className="flex items-center justify-between bg-white shadow-sm px-4 md:px-6 py-3 gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <Logo />
@@ -361,6 +382,7 @@ export default function Room() {
               onDownloadExcel={downloadExcel}
               onEndSession={endSession}
               onSettings={() => setSettingsOpen(true)}
+              onImportItems={() => setImportOpen(true)}
               canNavigate={bothFinalsSet}
             />
           ) : (

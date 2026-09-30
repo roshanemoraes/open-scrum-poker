@@ -35,8 +35,12 @@ export async function roomExists(id) {
 
 // The room object handed back by getRoom() IS the object stored in the Map, so every
 // mutation below persists simply by being applied in place — no separate "save" step.
-export async function addItem(room, name) {
-  return logic.addItem(room, name);
+export async function addItem(room, name, opts) {
+  return logic.addItem(room, name, opts);
+}
+
+export async function importItems(room, rows) {
+  return logic.importItems(room, rows);
 }
 
 export async function removeItem(room, itemId) {

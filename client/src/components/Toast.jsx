@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
 import { CheckIcon, CloseIcon } from './Icons.jsx';
 
+function InfoIcon(props) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" {...props}>
+      <circle cx="8" cy="8" r="6.3" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M8 7.2v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="8" cy="4.9" r="0.75" fill="currentColor" />
+    </svg>
+  );
+}
+
 const VARIANTS = {
   success: {
     bg: 'bg-emerald-500',
@@ -17,6 +27,14 @@ const VARIANTS = {
     iconColor: 'text-red-500',
     icon: CloseIcon,
     defaultTitle: 'Error!',
+  },
+  info: {
+    bg: 'bg-slate-600',
+    track: 'bg-slate-400/50',
+    bar: 'bg-slate-100',
+    iconColor: 'text-slate-600',
+    icon: InfoIcon,
+    defaultTitle: 'Heads up',
   },
 };
 

@@ -2,13 +2,19 @@ const JIRA_BASE_URL = (process.env.JIRA_BASE_URL || 'https://<your-organization>
 const JIRA_EMAIL = process.env.JIRA_EMAIL;
 const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
 
+// Explicit opt-in, separate from whether credentials happen to be set — lets a
+// deployment have JIRA_EMAIL/JIRA_API_TOKEN configured but still force Jira off
+// (e.g. to exercise the CSV-import flow), and makes "is Jira on" a deliberate
+// decision rather than an accident of which env vars happen to be present.
+const ENABLE_JIRA_INTEGRATION = (process.env.ENABLE_JIRA_INTEGRATION || '').trim().toLowerCase() === 'true';
+
 // Display names of the Jira custom fields to sync final values into.
 // Override via env if your site names them differently.
 const RCI_FIELD_NAME = process.env.RCI_FIELD_NAME || 'Requirement Clarity Index';
 const STORY_POINTS_FIELD_NAME = process.env.STORY_POINTS_FIELD_NAME || 'Story Points';
 
 export function isJiraConfigured() {
-  return !!(JIRA_EMAIL && JIRA_API_TOKEN);
+  return ENABLE_JIRA_INTEGRATION && !!(JIRA_EMAIL && JIRA_API_TOKEN);
 }
 
 export function getJiraBaseUrl() {
@@ -76,7 +82,10 @@ async function resolveFieldId(displayName) {
 // Pushes a poker "final" value (rci or effort) into the matching Jira
 // custom field on the issue. Throws with a message safe to show the host
 // if the value isn't numeric or the update is rejected by Jira.
-export async function pushFinalValue(issueKey, pollType, value) {
+// `authorization` is a full Authorization header value (a host's own `Bearer …` token);
+// omitted = the shared service-account token. Field-name lookup is a read, so it
+// always uses the shared one.
+export async function pushFinalValue(issueKey, pollType, value, authorization = authHeader()) {
   const numeric = Number(value);
   if (Number.isNaN(numeric)) {
     throw new Error(`"${value}" isn't a number — can't sync it to Jira`);
@@ -87,7 +96,7 @@ export async function pushFinalValue(issueKey, pollType, value) {
 
   const res = await fetch(`${await apiBase()}/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
     method: 'PUT',
-    headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+    headers: { Authorization: authorization, 'Content-Type': 'application/json' },
     body: JSON.stringify({ fields: { [fieldId]: numeric } }),
   });
 
