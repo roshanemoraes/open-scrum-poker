@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CloseIcon, ExternalLinkIcon, ChevronRightIcon } from '../Icons.jsx';
 import AdfContent from './AdfContent.jsx';
+import WikiMarkupContent from './WikiMarkupContent.jsx';
 import jiraLogo from '../../assets/icons/jira.png';
 
 const VISIBLE_COUNT = 3;
@@ -99,17 +100,51 @@ function CommentRow({ comment }) {
   );
 }
 
-export default function JiraDrawer({ issueKey, open, onClose }) {
+// Imported comments only ever have a date + wiki-markup body — the author is a raw
+// Jira account ID with no way to resolve a display name offline, so it's dropped
+// rather than shown as a meaningless string of digits/letters.
+function ImportedCommentRow({ comment }) {
+  return (
+    <div className="mb-5">
+      <div className="text-xs mb-[3px]" style={{ color: '#B3B6C2' }}>{comment.date}</div>
+      <div className="text-[13.5px] leading-[1.5]" style={{ color: '#4B4F5E' }}>
+        <WikiMarkupContent text={comment.body} />
+      </div>
+    </div>
+  );
+}
+
+export default function JiraDrawer({ item, open, onClose }) {
+  const issueKey = item?.name;
+  const isImported = item?.source === 'import';
   const [state, setState] = useState({ loading: false, error: null, issue: null });
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [showAllComments, setShowAllComments] = useState(false);
 
   useEffect(() => {
-    if (!open || !issueKey) return;
-    let cancelled = false;
-    setState({ loading: true, error: null, issue: null });
+    if (!open || !item) return;
     setCommentsOpen(false);
     setShowAllComments(false);
+
+    // Imported items already carry everything they need locally — no fetch, no
+    // loading state, and no Jira URL (so "Open in Jira" naturally stays hidden).
+    if (isImported) {
+      setState({
+        loading: false,
+        error: null,
+        issue: {
+          summary: item.imported?.title || item.name,
+          assignee: item.imported?.assignee || 'Unassigned',
+          acceptanceCriteria: item.imported?.acceptanceCriteria || '',
+          comments: item.imported?.comments || [],
+          url: null,
+        },
+      });
+      return;
+    }
+
+    let cancelled = false;
+    setState({ loading: true, error: null, issue: null });
 
     fetch(`/api/jira/${encodeURIComponent(issueKey)}`)
       .then(async (res) => {
@@ -123,7 +158,8 @@ export default function JiraDrawer({ issueKey, open, onClose }) {
     return () => {
       cancelled = true;
     };
-  }, [open, issueKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item?.id, item?.name, isImported]);
 
   const comments = state.issue?.comments || [];
   const visibleComments = showAllComments ? comments : comments.slice(0, VISIBLE_COUNT);
@@ -149,7 +185,14 @@ export default function JiraDrawer({ issueKey, open, onClose }) {
         <div className="flex items-center justify-between px-7 py-[18px] border-b shrink-0" style={{ borderColor: '#EEEFF4' }}>
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ background: '#EEF0FF' }}>
-              <img src={jiraLogo} alt="" className="w-3.5 h-3.5" />
+              {isImported ? (
+                <svg width="13" height="13" viewBox="0 0 15 15" fill="none">
+                  <path d="M7.5 9.5v-8M4.5 4.5l3-3 3 3" stroke="var(--accent)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M2 11v1.5A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V11" stroke="var(--accent)" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <img src={jiraLogo} alt="" className="w-3.5 h-3.5" />
+              )}
             </span>
             <span className="text-[15px] font-bold truncate" style={{ color: '#6B6F80' }}>{issueKey}</span>
           </div>
@@ -190,14 +233,23 @@ export default function JiraDrawer({ issueKey, open, onClose }) {
                 </div>
               </div>
 
-              {state.issue.description && (
-                <>
-                  <div className="text-xs font-extrabold mb-3.5" style={{ color: '#6B6F80', letterSpacing: '0.05em' }}>
-                    DESCRIPTION
-                  </div>
-                  <AdfContent doc={state.issue.description} />
-                </>
-              )}
+              {isImported
+                ? state.issue.acceptanceCriteria && (
+                    <>
+                      <div className="text-xs font-extrabold mb-3.5" style={{ color: '#6B6F80', letterSpacing: '0.05em' }}>
+                        ACCEPTANCE CRITERIA
+                      </div>
+                      <WikiMarkupContent text={state.issue.acceptanceCriteria} />
+                    </>
+                  )
+                : state.issue.description && (
+                    <>
+                      <div className="text-xs font-extrabold mb-3.5" style={{ color: '#6B6F80', letterSpacing: '0.05em' }}>
+                        DESCRIPTION
+                      </div>
+                      <AdfContent doc={state.issue.description} />
+                    </>
+                  )}
 
               <div className="h-px my-7" style={{ background: '#EEEFF4' }} />
 
@@ -223,7 +275,9 @@ export default function JiraDrawer({ issueKey, open, onClose }) {
 
               {commentsOpen && comments.length > 0 && (
                 <div>
-                  {visibleComments.map((c) => <CommentRow key={c.id} comment={c} />)}
+                  {isImported
+                    ? visibleComments.map((c, i) => <ImportedCommentRow key={i} comment={c} />)
+                    : visibleComments.map((c) => <CommentRow key={c.id} comment={c} />)}
 
                   {remaining > 0 && (
                     <button

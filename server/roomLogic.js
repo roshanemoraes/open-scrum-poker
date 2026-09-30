@@ -37,19 +37,56 @@ export function enabledPollTypes(room) {
   return Object.keys(room.config.polls);
 }
 
-export function makeItem(room, name) {
-  const item = { id: nanoid(8), name };
+// opts.source: 'jira' (default — the existing single-item add flow, verified live
+// against Jira when configured) or 'import' (bulk-loaded from a CSV export, carrying
+// its own title/assignee/acceptanceCriteria/comments so nothing needs to be fetched
+// later). The two can coexist in the same room's item list.
+export function makeItem(room, name, opts = {}) {
+  const source = opts.source === 'import' ? 'import' : 'jira';
+  const item = { id: nanoid(8), name, source };
+  if (source === 'import') {
+    const imported = opts.imported || {};
+    item.imported = {
+      title: imported.title || '',
+      assignee: imported.assignee || '',
+      acceptanceCriteria: imported.acceptanceCriteria || '',
+      comments: Array.isArray(imported.comments) ? imported.comments : [],
+    };
+  }
   for (const type of enabledPollTypes(room)) {
     item[type] = { votes: {}, revealed: false, final: null };
   }
   return item;
 }
 
-export function addItem(room, name) {
-  const item = makeItem(room, name);
+export function addItem(room, name, opts) {
+  const item = makeItem(room, name, opts);
   room.items.push(item);
   if (room.currentItemIndex === -1) room.currentItemIndex = 0;
   return item;
+}
+
+// Bulk-adds imported rows, skipping any whose name already exists in the room
+// (case-insensitive) — same duplicate rule the single-item add flow uses.
+export function importItems(room, rows) {
+  const existingNames = new Set(room.items.map((i) => i.name.toLowerCase()));
+  const added = [];
+  const skipped = [];
+
+  for (const row of rows || []) {
+    const name = row?.name?.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (existingNames.has(key)) {
+      skipped.push(name);
+      continue;
+    }
+    existingNames.add(key);
+    addItem(room, name, { source: 'import', imported: row });
+    added.push(name);
+  }
+
+  return { added, skipped };
 }
 
 export function removeItem(room, itemId) {
@@ -171,9 +208,11 @@ export function toPublicRoom(room, viewerParticipantId, connectedParticipantIds)
     id: room.id,
     name: room.name,
     config: room.config,
-    items: room.items.map((i) => ({ id: i.id, name: i.name })),
+    items: room.items.map((i) => ({ id: i.id, name: i.name, source: i.source || 'jira' })),
     currentItemIndex: room.currentItemIndex,
-    currentItem: item ? { id: item.id, name: item.name, ...currentItemPolls } : null,
+    currentItem: item
+      ? { id: item.id, name: item.name, source: item.source || 'jira', imported: item.imported || null, ...currentItemPolls }
+      : null,
     participants,
   };
 }

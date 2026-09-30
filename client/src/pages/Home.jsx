@@ -98,6 +98,7 @@ export default function Home() {
   const [hostCanVote, setHostCanVote] = useState(initialDraft?.hostCanVote ?? false);
 
   const [atlassianLoginEnabled, setAtlassianLoginEnabled] = useState(false);
+  const [jiraWriteAccess, setJiraWriteAccess] = useState(false);
 
   useEffect(() => {
     if (linkedRoom) {
@@ -368,8 +369,17 @@ export default function Home() {
                     atlassianLoginEnabled ? (
                       <div className="flex flex-col gap-3">
                         {loginError && <p className="text-sm text-red-500">{loginError}</p>}
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm text-slate-700">Request Jira write access</p>
+                            <p className="text-xs text-slate-400">
+                              Off: final values stay in this app only. On: they're also written to Jira as you.
+                            </p>
+                          </div>
+                          <Switch checked={jiraWriteAccess} onChange={setJiraWriteAccess} label="Request Jira write access" />
+                        </div>
                         <a
-                          href="/api/auth/atlassian/login"
+                          href={`/api/auth/atlassian/login${jiraWriteAccess ? '?write=1' : ''}`}
                           className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg py-2 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
                         >
                           Continue with Atlassian

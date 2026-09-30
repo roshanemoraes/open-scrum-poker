@@ -85,10 +85,16 @@ export async function roomExists(id) {
   return count > 0;
 }
 
-export async function addItem(room, name) {
-  const item = logic.addItem(room, name);
+export async function addItem(room, name, opts) {
+  const item = logic.addItem(room, name, opts);
   await save(room);
   return item;
+}
+
+export async function importItems(room, rows) {
+  const result = logic.importItems(room, rows);
+  await save(room);
+  return result;
 }
 
 export async function removeItem(room, itemId) {

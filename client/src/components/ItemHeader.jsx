@@ -13,13 +13,28 @@ function truncateTitle(title) {
   return `${title.slice(0, TITLE_CHAR_LIMIT).trimEnd()}…`;
 }
 
+function ImportedIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="shrink-0">
+      <rect x="2" y="2" width="16" height="16" rx="4" fill="#EEEDFB" />
+      <path d="M10 6.5v6M7.5 9.5l2.5 2.5 2.5-2.5" stroke="#5B4FE8" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function ItemHeader({ item, index, total, isHost, onNext, onManageItems, canNavigate = true }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [titleState, setTitleState] = useState({ loading: false, title: null });
+  const isImported = item?.source === 'import';
 
   useEffect(() => {
     if (!item) {
       setTitleState({ loading: false, title: null });
+      return;
+    }
+    // Imported items already carry their title locally — no fetch needed.
+    if (isImported) {
+      setTitleState({ loading: false, title: item.imported?.title || null });
       return;
     }
     let cancelled = false;
@@ -33,7 +48,7 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
     return () => {
       cancelled = true;
     };
-  }, [item?.name]);
+  }, [item?.name, isImported]);
 
   if (!item) {
     return (
@@ -69,7 +84,7 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
   return (
     <div className="bg-white border border-[#E4E1F2] rounded-[20px] shadow-[0_1px_2px_rgba(27,29,41,0.04)] p-4 flex items-center justify-between gap-2">
       <div className="flex-1 min-w-0 flex items-center justify-start gap-3">
-        <img src={jiraLogo} alt="Jira" className="w-5 h-5 shrink-0" />
+        {isImported ? <ImportedIcon /> : <img src={jiraLogo} alt="Jira" className="w-5 h-5 shrink-0" />}
         <h2 className="text-lg font-semibold text-slate-700 truncate flex items-center gap-2" title={titleState.title || undefined}>
           <span>{item.name}</span>
           {titleState.loading && <span className="jira-drawer-skel inline-block w-40 h-5 shrink-0" />}
@@ -84,10 +99,12 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
           <img src={viewLogo} alt="" className="w-5 h-5 shrink-0" />
           View
         </button>
-        <button onClick={openInJira} className="btn-secondary shrink-0">
-          <img src={openExternalLogo} alt="" className="w-5 h-5 shrink-0" />
-          Open in Jira
-        </button>
+        {!isImported && (
+          <button onClick={openInJira} className="btn-secondary shrink-0">
+            <img src={openExternalLogo} alt="" className="w-5 h-5 shrink-0" />
+            Open in Jira
+          </button>
+        )}
       </div>
 
       {isHost && (
@@ -101,7 +118,7 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
         </button>
       )}
 
-      <JiraDrawer issueKey={item.name} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <JiraDrawer item={item} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   );
 }

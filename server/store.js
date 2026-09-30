@@ -14,6 +14,7 @@ export const {
   deleteRoom,
   roomExists,
   addItem,
+  importItems,
   removeItem,
   currentItem,
   setCurrentItemIndex,
