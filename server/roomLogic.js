@@ -89,6 +89,31 @@ export function importItems(room, rows) {
   return { added, skipped };
 }
 
+// Bulk-adds items already confirmed to exist by a JQL search (server/jira.js's
+// searchJql) — these are ordinary source:'jira' items (live-fetched on demand, same as
+// a manually typed key), not "imported" snapshots, so no per-row existence
+// re-verification happens here. Same duplicate rule as the other add paths.
+export function addJiraItems(room, names) {
+  const existingNames = new Set(room.items.map((i) => i.name.toLowerCase()));
+  const added = [];
+  const skipped = [];
+
+  for (const raw of names || []) {
+    const name = raw?.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (existingNames.has(key)) {
+      skipped.push(name);
+      continue;
+    }
+    existingNames.add(key);
+    addItem(room, name);
+    added.push(name);
+  }
+
+  return { added, skipped };
+}
+
 export function removeItem(room, itemId) {
   const idx = room.items.findIndex((i) => i.id === itemId);
   if (idx === -1) return;

@@ -264,6 +264,15 @@ export default function ItemsPanel({
           </button>
         </form>
       )}
+      {isHost && (
+        <button
+          type="button"
+          onClick={onImportItems}
+          className="text-left text-[13.5px] font-semibold text-[#5B4FE8] hover:text-[#4038B8] mt-1"
+        >
+          Import many at once with a JQL query or CSV →
+        </button>
+      )}
       {duplicateError && (
         <p className="text-[12.5px] text-[#C43D3D] mt-1.5">{duplicateError}</p>
       )}

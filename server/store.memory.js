@@ -43,6 +43,10 @@ export async function importItems(room, rows) {
   return logic.importItems(room, rows);
 }
 
+export async function addJiraItems(room, names) {
+  return logic.addJiraItems(room, names);
+}
+
 export async function removeItem(room, itemId) {
   logic.removeItem(room, itemId);
 }

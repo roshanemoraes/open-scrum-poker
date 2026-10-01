@@ -129,6 +129,33 @@ export async function postAttributionComment(issueKey, text) {
   }
 }
 
+// Runs a JQL search for the "Import Items" JQL tab. Jira Cloud retired the old
+// GET /search endpoint (410 Gone) — /search/jql is the only one that still works, and
+// it's a POST. Only pulls the fields the results-preview table needs; the full issue
+// (description, comments, etc.) is fetched later, per item, the same way a manually
+// added item already is — these results just become ordinary source:'jira' items.
+export async function searchJql(jql, maxResults = 100) {
+  const res = await fetch(`${await apiBase()}/rest/api/3/search/jql`, {
+    method: 'POST',
+    headers: { Authorization: authHeader(), 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ jql, maxResults, fields: ['summary', 'issuetype', 'status'] }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const message = body?.errorMessages?.[0] || (typeof body?.errors === 'object' && Object.values(body.errors || {})[0]) || `Jira search failed (${res.status})`;
+    throw new Error(message);
+  }
+
+  const data = await res.json();
+  return (data.issues || []).map((issue) => ({
+    key: issue.key,
+    summary: issue.fields?.summary || '',
+    type: issue.fields?.issuetype?.name || '',
+    status: issue.fields?.status?.name || '',
+  }));
+}
+
 export async function fetchIssue(key) {
   const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64');
   const fields = 'summary,status,issuetype,priority,assignee,reporter,created,updated,description,comment';

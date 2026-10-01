@@ -157,6 +157,10 @@ export default function Room() {
       const skippedNote = skipped.length > 0 ? ` (${skipped.length} skipped — already in this sprint)` : '';
       showToast({ type: 'success', title: 'Import complete', message: `Added ${added.length} item${added.length === 1 ? '' : 's'}${skippedNote}` });
     });
+    socket.on('add-jira-items-result', ({ added, skipped }) => {
+      const skippedNote = skipped.length > 0 ? ` (${skipped.length} skipped — already in this sprint)` : '';
+      showToast({ type: 'success', title: 'Import complete', message: `Added ${added.length} item${added.length === 1 ? '' : 's'}${skippedNote}` });
+    });
 
     function processAddItemQueue() {
       const next = addItemQueue.current.shift();
@@ -178,6 +182,7 @@ export default function Room() {
       socket.off('jira-sync');
       socket.off('add-item-error');
       socket.off('import-items-result');
+      socket.off('add-jira-items-result');
       socket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -226,6 +231,10 @@ export default function Room() {
 
   function importItems(items) {
     socket.emit('import-items', { items });
+  }
+
+  function addJiraItems(names) {
+    socket.emit('add-jira-items', { names });
   }
 
   if (needsProfile) {
@@ -312,7 +321,10 @@ export default function Room() {
       <ImportItemsModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        onImport={importItems}
+        onImportCsv={importItems}
+        onAddJiraItems={addJiraItems}
+        hostToken={hostToken.current}
+        roomItems={room.items}
       />
 
       <header className="flex items-center justify-between bg-white shadow-sm px-4 md:px-6 py-3 gap-4">

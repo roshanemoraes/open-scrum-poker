@@ -97,6 +97,12 @@ export async function importItems(room, rows) {
   return result;
 }
 
+export async function addJiraItems(room, names) {
+  const result = logic.addJiraItems(room, names);
+  await save(room);
+  return result;
+}
+
 export async function removeItem(room, itemId) {
   logic.removeItem(room, itemId);
   await save(room);

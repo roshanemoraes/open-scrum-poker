@@ -30,6 +30,7 @@ import {
   roomExists,
   addItem,
   importItems,
+  addJiraItems,
   removeItem,
   setCurrentItemIndex,
   canLeaveCurrentItem,
@@ -47,7 +48,7 @@ import {
 import { setPresence, clearPresence, entriesForRoom } from './presence.js';
 
 import { buildWorkbook } from './exportXlsx.js';
-import { fetchIssue, isJiraConfigured, pushFinalValue, postAttributionComment, getJiraBaseUrl } from './jira.js';
+import { fetchIssue, isJiraConfigured, pushFinalValue, postAttributionComment, getJiraBaseUrl, searchJql } from './jira.js';
 
 const ENABLE_JIRA_ATTRIBUTION_COMMENT = (process.env.ENABLE_JIRA_ATTRIBUTION_COMMENT || '').trim().toLowerCase() === 'true';
 
@@ -137,6 +138,23 @@ app.get('/api/rooms/:id', async (req, res) => {
 
 app.get('/api/jira-config', (req, res) => {
   res.json({ configured: isJiraConfigured(), baseUrl: getJiraBaseUrl() });
+});
+
+// Host-gated (not just isJiraConfigured, like the per-key /api/jira/:key fetch below) —
+// arbitrary JQL is a much broader read surface than fetching one already-known issue.
+app.post('/api/jira/search', async (req, res) => {
+  const hostToken = req.header('x-host-token');
+  if (!isHostToken(hostToken)) return res.status(403).json({ error: 'Host login required' });
+  if (!isJiraConfigured()) return res.status(501).json({ error: 'Jira integration is not configured' });
+  const jql = (req.body?.jql || '').trim();
+  if (!jql) return res.status(400).json({ error: 'JQL query is required' });
+
+  try {
+    const items = await searchJql(jql);
+    res.json({ items });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.get('/api/jira/:key', async (req, res) => {
@@ -369,6 +387,18 @@ io.on('connection', (socket) => {
 
     const result = await importItems(room, items);
     socket.emit('import-items-result', result);
+    await emitRoom(roomId);
+  });
+
+  // Bulk-add from the JQL results picker — names were already confirmed to exist by
+  // the /api/jira/search call that produced them, so (unlike single add-item) there's
+  // no per-name fetchIssue re-check here.
+  socket.on('add-jira-items', async ({ names }) => {
+    const room = await requireHost();
+    if (!room || !Array.isArray(names) || names.length === 0) return;
+
+    const result = await addJiraItems(room, names);
+    socket.emit('add-jira-items-result', result);
     await emitRoom(roomId);
   });
 

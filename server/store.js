@@ -15,6 +15,7 @@ export const {
   roomExists,
   addItem,
   importItems,
+  addJiraItems,
   removeItem,
   currentItem,
   setCurrentItemIndex,

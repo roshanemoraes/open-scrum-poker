@@ -43,6 +43,17 @@ export async function createRoom(hostToken, name, config) {
   return res.json();
 }
 
+export async function searchJiraIssues(hostToken, jql) {
+  const res = await fetch('/api/jira/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
+    body: JSON.stringify({ jql }),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.error || "Jira couldn't run this query");
+  return body.items;
+}
+
 export async function roomExists(roomId) {
   const res = await fetch(`/api/rooms/${roomId}`);
   return res.ok;
