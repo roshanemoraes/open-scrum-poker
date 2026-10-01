@@ -32,43 +32,6 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-function Sk({ w, h, mb = 0, radius }) {
-  return <div className="jira-drawer-skel" style={{ width: w, height: h, marginBottom: mb, borderRadius: radius }} />;
-}
-
-function SkeletonBody() {
-  return (
-    <>
-      <Sk w="58%" h={26} mb={22} />
-
-      <Sk w={70} h={11} mb={8} />
-      <Sk w={140} h={16} mb={26} />
-
-      <Sk w={110} h={11} mb={16} />
-      <Sk w="44%" h={15} mb={10} />
-      <Sk w="96%" h={12} mb={8} />
-      <Sk w="88%" h={12} mb={8} />
-      <Sk w="92%" h={12} mb={22} />
-      <Sk w="38%" h={15} mb={10} />
-      <Sk w="90%" h={12} mb={8} />
-      <Sk w="80%" h={12} mb={34} />
-
-      <Sk w={130} h={11} mb={20} />
-
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="flex gap-3.5 mb-[22px]">
-          <Sk w={34} h={34} radius="50%" />
-          <div className="flex-1">
-            <Sk w={120} h={12} mb={9} />
-            <Sk w="95%" h={11} mb={6} />
-            <Sk w="70%" h={11} />
-          </div>
-        </div>
-      ))}
-    </>
-  );
-}
-
 function CommentRow({ comment }) {
   const attributed = attributionText(comment.body);
   return (
@@ -114,54 +77,25 @@ function ImportedCommentRow({ comment }) {
   );
 }
 
+// No live fetch of any kind — every item's data (if any) was already fetched once by
+// the host at add-time (server/index.js) and persisted on item.imported. This just
+// renders whatever's there, picking AdfContent/CommentRow (real Jira data: ADF
+// description, real comment authors) vs WikiMarkupContent/ImportedCommentRow (CSV
+// import: wiki-markup text, no resolvable comment author) by item.source.
 export default function JiraDrawer({ item, open, onClose }) {
   const issueKey = item?.name;
   const isImported = item?.source === 'import';
-  const [state, setState] = useState({ loading: false, error: null, issue: null });
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [showAllComments, setShowAllComments] = useState(false);
 
   useEffect(() => {
-    if (!open || !item) return;
+    if (!open) return;
     setCommentsOpen(false);
     setShowAllComments(false);
+  }, [open, item?.id]);
 
-    // Imported items already carry everything they need locally — no fetch, no
-    // loading state, and no Jira URL (so "Open in Jira" naturally stays hidden).
-    if (isImported) {
-      setState({
-        loading: false,
-        error: null,
-        issue: {
-          summary: item.imported?.title || item.name,
-          assignee: item.imported?.assignee || 'Unassigned',
-          acceptanceCriteria: item.imported?.acceptanceCriteria || '',
-          comments: item.imported?.comments || [],
-          url: null,
-        },
-      });
-      return;
-    }
-
-    let cancelled = false;
-    setState({ loading: true, error: null, issue: null });
-
-    fetch(`/api/jira/${encodeURIComponent(issueKey)}`)
-      .then(async (res) => {
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error || 'Failed to load issue');
-        return body;
-      })
-      .then((issue) => !cancelled && setState({ loading: false, error: null, issue }))
-      .catch((err) => !cancelled && setState({ loading: false, error: err.message, issue: null }));
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, item?.id, item?.name, isImported]);
-
-  const comments = state.issue?.comments || [];
+  const snapshot = item?.imported || null;
+  const comments = snapshot?.comments || [];
   const visibleComments = showAllComments ? comments : comments.slice(0, VISIBLE_COUNT);
   const remaining = comments.length - visibleComments.length;
 
@@ -197,8 +131,8 @@ export default function JiraDrawer({ item, open, onClose }) {
             <span className="text-[15px] font-bold truncate" style={{ color: '#6B6F80' }}>{issueKey}</span>
           </div>
           <div className="flex items-center gap-[18px] shrink-0">
-            {state.issue?.url && (
-              <a href={state.issue.url} target="_blank" rel="noreferrer" className="btn-secondary no-underline">
+            {!isImported && snapshot?.url && (
+              <a href={snapshot.url} target="_blank" rel="noreferrer" className="btn-secondary no-underline">
                 <ExternalLinkIcon width={14} height={14} strokeWidth={2.2} /> Open in Jira
               </a>
             )}
@@ -209,12 +143,11 @@ export default function JiraDrawer({ item, open, onClose }) {
         </div>
 
         <div className="jira-drawer-scroll flex-1 overflow-y-auto px-7 pt-[26px] pb-[60px]">
-          {state.loading && <SkeletonBody />}
-          {state.error && <p className="text-sm text-red-500">{state.error}</p>}
+          {!snapshot && <p className="text-sm text-slate-400">No details available for this item.</p>}
 
-          {state.issue && !state.loading && (
+          {snapshot && (
             <>
-              <h1 className="text-2xl font-semibold mb-5" style={{ color: '#1E2130' }}>{state.issue.summary}</h1>
+              <h1 className="text-2xl font-semibold mb-5" style={{ color: '#1E2130' }}>{snapshot.title || issueKey}</h1>
 
               <div
                 className="flex items-center gap-7 px-4 py-3.5 rounded-xl mb-7"
@@ -226,28 +159,28 @@ export default function JiraDrawer({ item, open, onClose }) {
                   </div>
                   <div
                     className="text-sm font-semibold"
-                    style={{ color: state.issue.assignee === 'Unassigned' ? '#B3B6C2' : '#1E2130' }}
+                    style={{ color: (snapshot.assignee || 'Unassigned') === 'Unassigned' ? '#B3B6C2' : '#1E2130' }}
                   >
-                    {state.issue.assignee}
+                    {snapshot.assignee || 'Unassigned'}
                   </div>
                 </div>
               </div>
 
               {isImported
-                ? state.issue.acceptanceCriteria && (
+                ? snapshot.acceptanceCriteria && (
                     <>
                       <div className="text-xs font-extrabold mb-3.5" style={{ color: '#6B6F80', letterSpacing: '0.05em' }}>
                         ACCEPTANCE CRITERIA
                       </div>
-                      <WikiMarkupContent text={state.issue.acceptanceCriteria} />
+                      <WikiMarkupContent text={snapshot.acceptanceCriteria} />
                     </>
                   )
-                : state.issue.description && (
+                : snapshot.description && (
                     <>
                       <div className="text-xs font-extrabold mb-3.5" style={{ color: '#6B6F80', letterSpacing: '0.05em' }}>
                         DESCRIPTION
                       </div>
-                      <AdfContent doc={state.issue.description} />
+                      <AdfContent doc={snapshot.description} />
                     </>
                   )}
 

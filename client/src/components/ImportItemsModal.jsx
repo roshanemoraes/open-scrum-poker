@@ -169,7 +169,9 @@ export default function ImportItemsModal({ open, onClose, onImportCsv, onAddJira
   function handleAdd() {
     if (tab === 'jql') {
       if (selected.size === 0) return;
-      onAddJiraItems(Array.from(selected));
+      // Full result objects (results already carries full detail, not just preview
+      // fields) — the server persists them as-is, no re-fetch.
+      onAddJiraItems(results.filter((it) => selected.has(it.key)));
     } else {
       if (!parsedCsv || parsedCsv.items.length === 0) return;
       onImportCsv(parsedCsv.items);

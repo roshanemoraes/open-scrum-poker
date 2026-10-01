@@ -131,14 +131,16 @@ export async function postAttributionComment(issueKey, text) {
 
 // Runs a JQL search for the "Import Items" JQL tab. Jira Cloud retired the old
 // GET /search endpoint (410 Gone) — /search/jql is the only one that still works, and
-// it's a POST. Only pulls the fields the results-preview table needs; the full issue
-// (description, comments, etc.) is fetched later, per item, the same way a manually
-// added item already is — these results just become ordinary source:'jira' items.
-export async function searchJql(jql, maxResults = 100) {
+// it's a POST. Pulls full issue detail (not just the results-preview fields) so a
+// selected result can be persisted as a complete snapshot at "Add" time with no
+// further per-item fetch — these results become ordinary source:'jira' items.
+// `authorization` is a full Authorization header value (a host's own `Bearer …`
+// token); omitted = the shared service-account token.
+export async function searchJql(jql, maxResults = 100, authorization = authHeader()) {
   const res = await fetch(`${await apiBase()}/rest/api/3/search/jql`, {
     method: 'POST',
-    headers: { Authorization: authHeader(), 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ jql, maxResults, fields: ['summary', 'issuetype', 'status'] }),
+    headers: { Authorization: authorization, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ jql, maxResults, fields: ['summary', 'issuetype', 'status', 'assignee', 'description', 'comment'] }),
   });
 
   if (!res.ok) {
@@ -148,20 +150,33 @@ export async function searchJql(jql, maxResults = 100) {
   }
 
   const data = await res.json();
-  return (data.issues || []).map((issue) => ({
-    key: issue.key,
-    summary: issue.fields?.summary || '',
-    type: issue.fields?.issuetype?.name || '',
-    status: issue.fields?.status?.name || '',
-  }));
+  return (data.issues || []).map((issue) => {
+    const f = issue.fields || {};
+    return {
+      key: issue.key,
+      url: `${JIRA_BASE_URL}/browse/${issue.key}`,
+      summary: f.summary || '',
+      type: f.issuetype?.name || '',
+      status: f.status?.name || '',
+      assignee: f.assignee?.displayName || 'Unassigned',
+      description: f.description || null,
+      comments: (f.comment?.comments || []).map((c) => ({
+        id: c.id,
+        author: c.author?.displayName || 'Unknown',
+        body: c.body || null,
+        created: c.created,
+      })),
+    };
+  });
 }
 
-export async function fetchIssue(key) {
-  const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64');
+// `authorization` is a full Authorization header value (a host's own `Bearer …`
+// token); omitted = the shared service-account token.
+export async function fetchIssue(key, authorization = authHeader()) {
   const fields = 'summary,status,issuetype,priority,assignee,reporter,created,updated,description,comment';
   const res = await fetch(`${await apiBase()}/rest/api/3/issue/${encodeURIComponent(key)}?fields=${fields}`, {
     headers: {
-      Authorization: `Basic ${auth}`,
+      Authorization: authorization,
       Accept: 'application/json',
     },
   });

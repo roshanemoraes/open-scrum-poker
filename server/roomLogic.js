@@ -37,20 +37,33 @@ export function enabledPollTypes(room) {
   return Object.keys(room.config.polls);
 }
 
-// opts.source: 'jira' (default — the existing single-item add flow, verified live
-// against Jira when configured) or 'import' (bulk-loaded from a CSV export, carrying
-// its own title/assignee/acceptanceCriteria/comments so nothing needs to be fetched
-// later). The two can coexist in the same room's item list.
+// opts.source: 'jira' (default — a real Jira issue, added via the single add-item
+// flow or the JQL bulk-add) or 'import' (bulk-loaded from a CSV export). Both now
+// carry a one-time snapshot in opts.imported — fetched once by the server at add
+// time and never re-fetched — but in two different shapes, since they come from two
+// different data sources:
+//   'jira'   -> { title, assignee, description (ADF), comments (ADF bodies), url }
+//   'import' -> { title, assignee, acceptanceCriteria (wiki markup), comments (plain text) }
+// Nothing — host or guest — fetches live from Jira after an item is added; the client
+// picks its renderer (AdfContent vs WikiMarkupContent) based on which shape is present.
 export function makeItem(room, name, opts = {}) {
   const source = opts.source === 'import' ? 'import' : 'jira';
   const item = { id: nanoid(8), name, source };
-  if (source === 'import') {
-    const imported = opts.imported || {};
+  const imported = opts.imported;
+  if (source === 'import' && imported) {
     item.imported = {
       title: imported.title || '',
       assignee: imported.assignee || '',
       acceptanceCriteria: imported.acceptanceCriteria || '',
       comments: Array.isArray(imported.comments) ? imported.comments : [],
+    };
+  } else if (source === 'jira' && imported) {
+    item.imported = {
+      title: imported.title || '',
+      assignee: imported.assignee || '',
+      description: imported.description || null,
+      comments: Array.isArray(imported.comments) ? imported.comments : [],
+      url: imported.url || null,
     };
   }
   for (const type of enabledPollTypes(room)) {
@@ -89,17 +102,17 @@ export function importItems(room, rows) {
   return { added, skipped };
 }
 
-// Bulk-adds items already confirmed to exist by a JQL search (server/jira.js's
-// searchJql) — these are ordinary source:'jira' items (live-fetched on demand, same as
-// a manually typed key), not "imported" snapshots, so no per-row existence
-// re-verification happens here. Same duplicate rule as the other add paths.
-export function addJiraItems(room, names) {
+// Bulk-adds items picked from a JQL search — each row is the full result object
+// /api/jira/search already returned (key, title, assignee, description, comments,
+// url), so this persists it as a source:'jira' snapshot with no further fetch, same
+// as a manually added item. Same duplicate rule as the other add paths.
+export function addJiraItems(room, rows) {
   const existingNames = new Set(room.items.map((i) => i.name.toLowerCase()));
   const added = [];
   const skipped = [];
 
-  for (const raw of names || []) {
-    const name = raw?.trim();
+  for (const row of rows || []) {
+    const name = (row?.key || row?.name)?.trim();
     if (!name) continue;
     const key = name.toLowerCase();
     if (existingNames.has(key)) {
@@ -107,7 +120,10 @@ export function addJiraItems(room, names) {
       continue;
     }
     existingNames.add(key);
-    addItem(room, name);
+    addItem(room, name, {
+      source: 'jira',
+      imported: { title: row.summary, assignee: row.assignee, description: row.description, comments: row.comments, url: row.url },
+    });
     added.push(name);
   }
 

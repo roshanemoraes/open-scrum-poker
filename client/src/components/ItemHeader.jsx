@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { getJiraBaseUrl } from './jira/jiraConfig.js';
+import { useState } from 'react';
 import JiraDrawer from './jira/JiraDrawer.jsx';
 import jiraLogo from '../assets/icons/jira.png';
 import viewLogo from '../assets/icons/view.png'
@@ -24,31 +23,6 @@ function ImportedIcon() {
 
 export default function ItemHeader({ item, index, total, isHost, onNext, onManageItems, canNavigate = true }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [titleState, setTitleState] = useState({ loading: false, title: null });
-  const isImported = item?.source === 'import';
-
-  useEffect(() => {
-    if (!item) {
-      setTitleState({ loading: false, title: null });
-      return;
-    }
-    // Imported items already carry their title locally — no fetch needed.
-    if (isImported) {
-      setTitleState({ loading: false, title: item.imported?.title || null });
-      return;
-    }
-    let cancelled = false;
-    setTitleState({ loading: true, title: null });
-
-    fetch(`/api/jira/${encodeURIComponent(item.name)}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => !cancelled && setTitleState({ loading: false, title: data?.summary || null }))
-      .catch(() => !cancelled && setTitleState({ loading: false, title: null }));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [item?.name, isImported]);
 
   if (!item) {
     return (
@@ -75,22 +49,19 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
     );
   }
 
-  async function openInJira() {
-    const baseUrl = await getJiraBaseUrl();
-    if (!baseUrl) return;
-    window.open(`${baseUrl}/browse/${encodeURIComponent(item.name)}`, '_blank', 'noopener');
-  }
+  // No live Jira fetch of any kind, for anyone — every item's data (if any) was
+  // fetched once by the host at add-time and persisted on the item itself.
+  const isImported = item.source === 'import';
+  const title = item.imported?.title || null;
+  const jiraUrl = item.imported?.url || null;
 
   return (
     <div className="bg-white border border-[#E4E1F2] rounded-[20px] shadow-[0_1px_2px_rgba(27,29,41,0.04)] p-4 flex items-center justify-between gap-2">
       <div className="flex-1 min-w-0 flex items-center justify-start gap-3">
         {isImported ? <ImportedIcon /> : <img src={jiraLogo} alt="Jira" className="w-5 h-5 shrink-0" />}
-        <h2 className="text-lg font-semibold text-slate-700 truncate flex items-center gap-2" title={titleState.title || undefined}>
+        <h2 className="text-lg font-semibold text-slate-700 truncate flex items-center gap-2" title={title || undefined}>
           <span>{item.name}</span>
-          {titleState.loading && <span className="jira-drawer-skel inline-block w-40 h-5 shrink-0" />}
-          {!titleState.loading && titleState.title && (
-            <span className="font-semibold text-slate-700 truncate">: {truncateTitle(titleState.title)}</span>
-          )}
+          {title && <span className="font-semibold text-slate-700 truncate">: {truncateTitle(title)}</span>}
         </h2>
       </div>
 
@@ -99,11 +70,11 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
           <img src={viewLogo} alt="" className="w-5 h-5 shrink-0" />
           View
         </button>
-        {!isImported && (
-          <button onClick={openInJira} className="btn-secondary shrink-0">
+        {!isImported && jiraUrl && (
+          <a href={jiraUrl} target="_blank" rel="noreferrer" className="btn-secondary shrink-0 no-underline">
             <img src={openExternalLogo} alt="" className="w-5 h-5 shrink-0" />
             Open in Jira
-          </button>
+          </a>
         )}
       </div>
 

@@ -233,8 +233,8 @@ export default function Room() {
     socket.emit('import-items', { items });
   }
 
-  function addJiraItems(names) {
-    socket.emit('add-jira-items', { names });
+  function addJiraItems(items) {
+    socket.emit('add-jira-items', { items });
   }
 
   if (needsProfile) {

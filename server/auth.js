@@ -34,11 +34,12 @@ export function hostHasJiraWriteAccess(token) {
   return !!getHostSession(token)?.jiraWriteEnabled;
 }
 
-// Access token for writing to Jira as this host, or null if the session has none (e.g.
-// a password login, or an Atlassian login that didn't request write access) or the
-// refresh failed. Concurrent callers share one in-flight refresh, since Atlassian's
-// rotating refresh tokens can only be redeemed once.
-export async function getJiraWriteAccessToken(token) {
+// Access token for calling Jira as this host — used for both reads (every Atlassian
+// login gets read:jira-work) and writes (only if hostHasJiraWriteAccess). Null if the
+// session has none (e.g. a password login) or the refresh failed. Concurrent callers
+// share one in-flight refresh, since Atlassian's rotating refresh tokens can only be
+// redeemed once.
+export async function getHostJiraAccessToken(token) {
   const session = getHostSession(token);
   const jira = session?.jira;
   if (!jira?.accessToken) return null;

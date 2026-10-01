@@ -74,11 +74,17 @@ export function buildAuthorizeUrl(state, wantsWrite) {
   const params = new URLSearchParams({
     audience: 'api.atlassian.com',
     client_id: CLIENT_ID,
-    // write:jira-work lets the host's own token write final values back to Jira;
-    // offline_access yields a refresh token so that keeps working past the ~1h access token.
-    // Read-only hosts (the default) only get read:me — Jira final-value syncs for them
-    // are skipped rather than attempted with a token that can't write.
-    scope: wantsWrite ? 'read:me write:jira-work offline_access' : 'read:me',
+    // read:jira-work is required for every Jira REST API v3 read (issue fetch, JQL
+    // search) — read:me alone only works against api.atlassian.com/me (identity).
+    // read:jira-user resolves assignee/reporter/comment-author display names (without
+    // it those can come back restricted/null). offline_access (a refresh token) is
+    // requested unconditionally too, now that the host's token is used for real API
+    // calls throughout the session, not just at login — without it a read-only host's
+    // access would silently die after ~1h. write:jira-work is added only when the
+    // host opted into it.
+    scope: wantsWrite
+      ? 'read:me read:jira-work read:jira-user write:jira-work offline_access'
+      : 'read:me read:jira-work read:jira-user offline_access',
     redirect_uri: REDIRECT_URI,
     response_type: 'code',
     prompt: 'consent',

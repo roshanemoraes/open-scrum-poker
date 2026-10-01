@@ -12,7 +12,7 @@ import {
   isHostToken,
   getHostSession,
   hostHasJiraWriteAccess,
-  getJiraWriteAccessToken,
+  getHostJiraAccessToken,
 } from './auth.js';
 import {
   isAtlassianLoginEnabled,
@@ -140,8 +140,21 @@ app.get('/api/jira-config', (req, res) => {
   res.json({ configured: isJiraConfigured(), baseUrl: getJiraBaseUrl() });
 });
 
-// Host-gated (not just isJiraConfigured, like the per-key /api/jira/:key fetch below) —
-// arbitrary JQL is a much broader read surface than fetching one already-known issue.
+// Resolves what Authorization header a Jira read call should use for this host.
+// When Atlassian login is on, every host's own token already has read:jira-work
+// (see atlassianAuth.js) — reads never touch the shared service-account token in that
+// mode. When it's off (password-login hosts), `authorization: undefined` makes
+// jira.js's read calls fall back to their default (the shared token).
+async function resolveJiraReadAuth(hostToken) {
+  if (!isAtlassianLoginEnabled()) return { authorization: undefined };
+  const accessToken = await getHostJiraAccessToken(hostToken);
+  if (!accessToken) return { error: 'Your Atlassian session expired — log in again to use Jira.' };
+  return { authorization: `Bearer ${accessToken}` };
+}
+
+// Host-gated (not just isJiraConfigured) — arbitrary JQL is a much broader read
+// surface than fetching one already-known issue, and (when Atlassian login is on)
+// this is a per-host token, so it has to be the host making the call anyway.
 app.post('/api/jira/search', async (req, res) => {
   const hostToken = req.header('x-host-token');
   if (!isHostToken(hostToken)) return res.status(403).json({ error: 'Host login required' });
@@ -149,26 +162,21 @@ app.post('/api/jira/search', async (req, res) => {
   const jql = (req.body?.jql || '').trim();
   if (!jql) return res.status(400).json({ error: 'JQL query is required' });
 
+  const auth = await resolveJiraReadAuth(hostToken);
+  if (auth.error) return res.status(401).json({ error: auth.error });
+
   try {
-    const items = await searchJql(jql);
+    const items = await searchJql(jql, 100, auth.authorization);
     res.json({ items });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-app.get('/api/jira/:key', async (req, res) => {
-  if (!isJiraConfigured()) return res.status(501).json({ error: 'Jira integration is not configured' });
-  if (!/^[A-Z][A-Z0-9]*-\d+$/i.test(req.params.key)) return res.status(400).json({ error: 'Invalid issue key' });
-
-  try {
-    const issue = await fetchIssue(req.params.key);
-    if (issue.notFound) return res.status(404).json({ error: 'Issue not found' });
-    res.json(issue);
-  } catch (err) {
-    res.status(502).json({ error: 'Failed to reach Jira' });
-  }
-});
+// There is no longer a per-key issue-fetch endpoint — guests never call Jira
+// directly (read or write). Every item's Jira data is fetched once by the host at
+// add-time and persisted on the item itself (item.imported); ItemHeader/JiraDrawer
+// read from room-state only.
 
 app.get('/api/rooms/:id/export', async (req, res) => {
   const hostToken = req.query.token;
@@ -314,7 +322,7 @@ io.on('connection', (socket) => {
         });
         return;
       }
-      const accessToken = await getJiraWriteAccessToken(hostSessionToken);
+      const accessToken = await getHostJiraAccessToken(hostSessionToken);
       if (!accessToken) {
         io.to(roomId).emit('jira-sync', {
           itemName: item.name,
@@ -360,20 +368,29 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Fetched once, here, and persisted on the item (item.imported) — never fetched
+    // again. Guests (and the host, after this point) only ever read it from room-state.
+    let imported;
     if (isJiraConfigured()) {
+      const auth = await resolveJiraReadAuth(hostSessionToken);
+      if (auth.error) {
+        socket.emit('add-item-error', { name: trimmed, error: auth.error });
+        return;
+      }
       try {
-        const issue = await fetchIssue(trimmed);
+        const issue = await fetchIssue(trimmed, auth.authorization);
         if (issue.notFound) {
           socket.emit('add-item-error', { name: trimmed, error: `${trimmed} was not found in Jira` });
           return;
         }
+        imported = { title: issue.summary, assignee: issue.assignee, description: issue.description, comments: issue.comments, url: issue.url };
       } catch (err) {
         socket.emit('add-item-error', { name: trimmed, error: `Couldn't verify ${trimmed} in Jira: ${err.message}` });
         return;
       }
     }
 
-    await addItem(room, trimmed);
+    await addItem(room, trimmed, imported ? { source: 'jira', imported } : undefined);
     await emitRoom(roomId);
   });
 
@@ -390,14 +407,15 @@ io.on('connection', (socket) => {
     await emitRoom(roomId);
   });
 
-  // Bulk-add from the JQL results picker — names were already confirmed to exist by
-  // the /api/jira/search call that produced them, so (unlike single add-item) there's
-  // no per-name fetchIssue re-check here.
-  socket.on('add-jira-items', async ({ names }) => {
+  // Bulk-add from the JQL results picker. The client sends back the full result
+  // objects it already has from /api/jira/search (which now fetches full detail, not
+  // just preview fields) — no per-item re-fetch here, same "fetched once, persisted"
+  // rule as single add-item.
+  socket.on('add-jira-items', async ({ items }) => {
     const room = await requireHost();
-    if (!room || !Array.isArray(names) || names.length === 0) return;
+    if (!room || !Array.isArray(items) || items.length === 0) return;
 
-    const result = await addJiraItems(room, names);
+    const result = await addJiraItems(room, items);
     socket.emit('add-jira-items-result', result);
     await emitRoom(roomId);
   });
