@@ -22,6 +22,8 @@ import PollPanel from '../components/PollPanel.jsx';
 import Avatar from '../components/avatar/Avatar.jsx';
 import AvatarPicker from '../components/avatar/AvatarPicker.jsx';
 import Toast from '../components/Toast.jsx';
+import UnsavedVotesModal from '../components/UnsavedVotesModal.jsx';
+import ConfirmModal from '../components/ConfirmModal.jsx';
 import UserMenu from '../components/UserMenu.jsx';
 import SessionSettingsModal from '../components/SessionSettingsModal.jsx';
 import ImportItemsModal from '../components/ImportItemsModal.jsx';
@@ -94,8 +96,16 @@ export default function Room() {
   const [importOpen, setImportOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [addingItem, setAddingItem] = useState(false);
+  const [pendingNavIndex, setPendingNavIndex] = useState(null);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
+  const [endSessionConfirmOpen, setEndSessionConfirmOpen] = useState(false);
   const hostToken = useRef(getHostToken());
   const addItemQueue = useRef([]);
+
+  function showToast(next) {
+    setToast(next);
+    setTimeout(() => setToast((cur) => (cur === next ? null : cur)), 6000);
+  }
 
   useEffect(() => {
     if (needsProfile) return;
@@ -133,10 +143,6 @@ export default function Room() {
       socket.disconnect();
       navigate('/');
     });
-    function showToast(next) {
-      setToast(next);
-      setTimeout(() => setToast((cur) => (cur === next ? null : cur)), 6000);
-    }
     socket.on('jira-sync', (payload) => {
       const label = payload.pollType === 'rci' ? 'RCI' : 'Effort';
       if (payload.skipped) {
@@ -209,7 +215,11 @@ export default function Room() {
   }
 
   function endSession() {
-    if (!window.confirm('End this session for everyone? This cannot be undone.')) return;
+    setEndSessionConfirmOpen(true);
+  }
+
+  function confirmEndSession() {
+    setEndSessionConfirmOpen(false);
     socket.emit('end-session');
   }
 
@@ -297,7 +307,32 @@ export default function Room() {
   const me = room.participants.find((p) => p.id === getParticipantId(room.id));
   const canVote = !me?.isObserver;
   const pollTypes = Object.keys(room.config?.polls || {});
-  const bothFinalsSet = !room.currentItem || pollTypes.every((type) => room.currentItem[type]?.final != null);
+  const hasUnsavedVotes =
+    !!room.currentItem && pollTypes.some((type) => (room.currentItem[type]?.votedCount || 0) > 0 && room.currentItem[type]?.final == null);
+
+  // Host navigation gateway: jump straight there unless the current item has votes
+  // cast but not finalized yet, in which case confirm via the discard modal first
+  // (bypassed for the rest of this session once "Don't ask again" is checked).
+  function requestGoTo(index) {
+    if (index < 0 || index >= room.items.length || index === room.currentItemIndex) return;
+    if (hasUnsavedVotes && !dontAskAgain) {
+      setPendingNavIndex(index);
+    } else {
+      socket.emit('set-current-item', { index });
+    }
+  }
+
+  function cancelNav() {
+    setPendingNavIndex(null);
+  }
+
+  function confirmDiscardNav() {
+    const index = pendingNavIndex;
+    const leftItemName = room.currentItem?.name;
+    socket.emit('discard-and-switch-item', { index });
+    setPendingNavIndex(null);
+    if (leftItemName) showToast({ type: 'info', title: 'Discarded', message: `Votes for ${leftItemName} discarded` });
+  }
 
   // Prefer the Atlassian identity (only ever set for a host who logged in that way);
   // everyone else — guests, and hosts on the plain password flow — shows their typed name.
@@ -325,6 +360,30 @@ export default function Room() {
         onAddJiraItems={addJiraItems}
         hostToken={hostToken.current}
         roomItems={room.items}
+      />
+
+      <UnsavedVotesModal
+        open={pendingNavIndex != null}
+        currentItemName={room.currentItem?.name}
+        targetItemName={pendingNavIndex != null ? room.items[pendingNavIndex]?.name : ''}
+        pollRows={pollTypes.map((type) => ({
+          label: room.config.polls[type].label,
+          votedCount: room.currentItem?.[type]?.votedCount || 0,
+          total: room.participants.filter((p) => !p.isObserver).length,
+        }))}
+        dontAskAgain={dontAskAgain}
+        onToggleDontAskAgain={() => setDontAskAgain((v) => !v)}
+        onCancel={cancelNav}
+        onDiscard={confirmDiscardNav}
+      />
+
+      <ConfirmModal
+        open={endSessionConfirmOpen}
+        title="End this session for everyone?"
+        message="This cannot be undone."
+        confirmLabel="End session"
+        onCancel={() => setEndSessionConfirmOpen(false)}
+        onConfirm={confirmEndSession}
       />
 
       <header className="flex items-center justify-between bg-white shadow-sm px-4 md:px-6 py-3 gap-4">
@@ -387,15 +446,15 @@ export default function Room() {
                   socket.emit('add-item', { name: addItemQueue.current.shift() });
                 }
               }}
-              onSelect={(index) => socket.emit('set-current-item', { index })}
+              pollConfig={room.config?.polls}
+              onSelect={(index) => requestGoTo(index)}
               onRemove={(itemId) => socket.emit('remove-item', { itemId })}
-              onPrev={() => socket.emit('set-current-item', { index: room.currentItemIndex - 1 })}
-              onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
+              onPrev={() => requestGoTo(room.currentItemIndex - 1)}
+              onNext={() => requestGoTo(room.currentItemIndex + 1)}
               onDownloadExcel={downloadExcel}
               onEndSession={endSession}
               onSettings={() => setSettingsOpen(true)}
               onImportItems={() => setImportOpen(true)}
-              canNavigate={bothFinalsSet}
             />
           ) : (
             <ItemHeader
@@ -403,10 +462,9 @@ export default function Room() {
               index={room.currentItemIndex}
               total={room.items.length}
               isHost={isHost}
-              onPrev={() => socket.emit('set-current-item', { index: room.currentItemIndex - 1 })}
-              onNext={() => socket.emit('set-current-item', { index: room.currentItemIndex + 1 })}
+              onPrev={() => requestGoTo(room.currentItemIndex - 1)}
+              onNext={() => requestGoTo(room.currentItemIndex + 1)}
               onManageItems={() => setManageItems(true)}
-              canNavigate={bothFinalsSet}
             />
           )}
 

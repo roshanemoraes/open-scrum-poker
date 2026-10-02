@@ -33,7 +33,7 @@ import {
   addJiraItems,
   removeItem,
   setCurrentItemIndex,
-  canLeaveCurrentItem,
+  discardAndSwitchItem,
   currentItem,
   vote,
   reveal,
@@ -430,8 +430,16 @@ io.on('connection', (socket) => {
   socket.on('set-current-item', async ({ index }) => {
     const room = await requireHost();
     if (!room) return;
-    if (index !== room.currentItemIndex && !(await canLeaveCurrentItem(room))) return;
     await setCurrentItemIndex(room, index);
+    await emitRoom(roomId);
+  });
+
+  // Host confirmed the "Discard & go to …" modal — clear the item being left (same
+  // as the existing reset-item action) and switch to the target index, atomically.
+  socket.on('discard-and-switch-item', async ({ index }) => {
+    const room = await requireHost();
+    if (!room) return;
+    await discardAndSwitchItem(room, index);
     await emitRoom(roomId);
   });
 

@@ -118,8 +118,10 @@ export async function setCurrentItemIndex(room, index) {
   return ok;
 }
 
-export async function canLeaveCurrentItem(room) {
-  return logic.canLeaveCurrentItem(room);
+export async function discardAndSwitchItem(room, index) {
+  const ok = logic.discardAndSwitchItem(room, index);
+  if (ok) await save(room);
+  return ok;
 }
 
 export async function vote(room, participantId, pollType, value) {

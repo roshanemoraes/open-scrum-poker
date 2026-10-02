@@ -150,13 +150,6 @@ export function setCurrentItemIndex(room, index) {
   return true;
 }
 
-// Host must confirm final values for every enabled poll before leaving the item they're on.
-export function canLeaveCurrentItem(room) {
-  const item = currentItem(room);
-  if (!item) return true;
-  return enabledPollTypes(room).every((type) => item[type]?.final != null);
-}
-
 export function vote(room, participantId, pollType, value) {
   const item = currentItem(room);
   if (!item) return false;
@@ -188,6 +181,16 @@ export function resetItemVotes(room) {
     item[type].revealed = false;
     item[type].final = null;
   }
+}
+
+// The host explicitly chose to leave unsaved votes behind (confirmed the "Discard &
+// go to …" modal) — clear the item they're leaving the same way resetItemVotes does,
+// then switch, as one atomic step so no other client can observe a half-done state.
+export function discardAndSwitchItem(room, index) {
+  if (index < 0 || index >= room.items.length) return false;
+  resetItemVotes(room);
+  room.currentItemIndex = index;
+  return true;
 }
 
 export function setFinal(room, pollType, value) {
@@ -249,7 +252,18 @@ export function toPublicRoom(room, viewerParticipantId, connectedParticipantIds)
     id: room.id,
     name: room.name,
     config: room.config,
-    items: room.items.map((i) => ({ id: i.id, name: i.name, source: i.source || 'jira' })),
+    // polls here is a minimal per-item summary (just counts + final, never raw votes)
+    // so the Sprint items list can show "Unsaved votes" / "Final: …" badges on every
+    // item, not just the current one — safe to send regardless of revealed state
+    // since it never reveals who voted what, only how many have and whether it's final.
+    items: room.items.map((i) => {
+      const polls = {};
+      for (const type of enabledPollTypes(room)) {
+        const poll = i[type];
+        polls[type] = { votedCount: poll ? Object.keys(poll.votes).length : 0, final: poll?.final ?? null };
+      }
+      return { id: i.id, name: i.name, source: i.source || 'jira', polls };
+    }),
     currentItemIndex: room.currentItemIndex,
     currentItem: item
       ? { id: item.id, name: item.name, source: item.source || 'jira', imported: item.imported || null, ...currentItemPolls }

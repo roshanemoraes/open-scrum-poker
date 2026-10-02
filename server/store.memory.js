@@ -59,8 +59,8 @@ export async function setCurrentItemIndex(room, index) {
   return logic.setCurrentItemIndex(room, index);
 }
 
-export async function canLeaveCurrentItem(room) {
-  return logic.canLeaveCurrentItem(room);
+export async function discardAndSwitchItem(room, index) {
+  return logic.discardAndSwitchItem(room, index);
 }
 
 export async function vote(room, participantId, pollType, value) {

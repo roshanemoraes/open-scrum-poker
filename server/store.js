@@ -19,7 +19,7 @@ export const {
   removeItem,
   currentItem,
   setCurrentItemIndex,
-  canLeaveCurrentItem,
+  discardAndSwitchItem,
   vote,
   reveal,
   resetPoll,

@@ -59,13 +59,23 @@ function ChevronIcon({ direction }) {
   );
 }
 
-function WarningIcon() {
+function UnsavedVotesBadge() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
-      <circle cx="8" cy="8" r="6.3" stroke="#B8860F" strokeWidth="1.3" />
-      <path d="M8 5.5v3.2" stroke="#B8860F" strokeWidth="1.3" strokeLinecap="round" />
-      <circle cx="8" cy="10.8" r="0.7" fill="#B8860F" />
-    </svg>
+    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#92400E] bg-[#FEF3C7] px-[10px] py-1 rounded-full shrink-0">
+      <span className="w-[7px] h-[7px] rounded-full bg-[#D97706]" />
+      Unsaved votes
+    </span>
+  );
+}
+
+function FinalBadge({ text }) {
+  return (
+    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-[#166534] bg-[#DCFCE7] px-[10px] py-1 rounded-full shrink-0">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 12l5 5L20 7" />
+      </svg>
+      {text}
+    </span>
   );
 }
 
@@ -83,6 +93,7 @@ export default function ItemsPanel({
   isHost,
   adding,
   itemPrefix = '',
+  pollConfig,
   onAdd,
   onSelect,
   onRemove,
@@ -92,7 +103,6 @@ export default function ItemsPanel({
   onEndSession,
   onSettings,
   onImportItems,
-  canNavigate = true,
 }) {
   const [newNumber, setNewNumber] = useState('');
   const [duplicateError, setDuplicateError] = useState('');
@@ -128,9 +138,24 @@ export default function ItemsPanel({
     setNewNumber('');
   }
 
-  const canPrev = currentItemIndex > 0 && canNavigate;
-  const canNext = currentItemIndex < items.length - 1 && canNavigate;
+  const canPrev = currentItemIndex > 0;
+  const canNext = currentItemIndex < items.length - 1;
   const navBase = 'flex items-center gap-1 px-3 py-[7px] rounded-[8px] text-[13px] font-semibold transition-colors';
+  const pollTypes = Object.keys(pollConfig || {});
+
+  // Badge state for an item row: "Unsaved votes" if any enabled poll has votes cast
+  // but isn't final yet, "Final: ..." once every enabled poll has a final value.
+  function itemBadge(item) {
+    const polls = item.polls || {};
+    const isFinal = pollTypes.length > 0 && pollTypes.every((type) => polls[type]?.final != null);
+    if (isFinal) {
+      const text = pollTypes.map((type) => `${pollConfig[type].label} ${polls[type].final}`).join(' · ');
+      return <FinalBadge text={text} />;
+    }
+    const isVoting = pollTypes.some((type) => (polls[type]?.votedCount || 0) > 0);
+    if (isVoting) return <UnsavedVotesBadge />;
+    return null;
+  }
 
   return (
     <div className="bg-white border border-[#E4E1F2] rounded-[20px] p-[26px_28px_28px] shadow-[0_1px_2px_rgba(27,29,41,0.04)]" style={PLEX_SANS}>
@@ -177,7 +202,6 @@ export default function ItemsPanel({
           <button
             onClick={onPrev}
             disabled={!canPrev}
-            title={!canNavigate ? 'Set final values for this item before moving on' : undefined}
             className={[navBase, canPrev ? 'text-[#4A4763] hover:bg-[#F5F4FB]' : 'text-[#B4B0C9] cursor-not-allowed'].join(' ')}
           >
             <ChevronIcon direction="left" /> Prev
@@ -185,7 +209,6 @@ export default function ItemsPanel({
           <button
             onClick={onNext}
             disabled={!canNext}
-            title={!canNavigate ? 'Set final values for this item before moving on' : undefined}
             className={[navBase, canNext ? 'text-[#4A4763] hover:bg-[#F5F4FB]' : 'text-[#B4B0C9] cursor-not-allowed'].join(' ')}
           >
             Next <ChevronIcon direction="right" />
@@ -193,32 +216,25 @@ export default function ItemsPanel({
         </div>
       </div>
 
-      {!canNavigate && (
-        <div className="flex items-center gap-2.5 bg-[#FDF6E7] border border-[#F3E3B8] rounded-[10px] px-4 py-[11px] mb-[14px]">
-          <WarningIcon />
-          <span className="text-[13.5px] text-[#8A6A15]">Set final values for this item before switching items.</span>
-        </div>
-      )}
-
       <div className="flex flex-col gap-1 max-h-40 overflow-y-auto mb-4">
         {items.map((item, idx) => {
-          const locked = !canNavigate && idx !== currentItemIndex;
           const isCurrent = idx === currentItemIndex;
           return (
             <div
               key={item.id}
               className={[
-                'flex items-center justify-between rounded-[12px] px-4 py-3 transition-colors',
-                locked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer',
+                'flex items-center justify-between rounded-[12px] px-4 py-3 transition-colors cursor-pointer',
                 isCurrent ? 'bg-[#EFEDFC]' : 'hover:bg-[#F5F4FB]',
               ].join(' ')}
-              onClick={() => !locked && onSelect(idx)}
+              onClick={() => onSelect(idx)}
             >
               <span className={['flex items-center gap-1.5 min-w-0 truncate text-[14.5px]', isCurrent ? 'font-semibold text-[#4038B8]' : 'font-medium text-[#4A4763]'].join(' ')}>
                 {idx + 1}. {item.name}
                 {item.source === 'import' && <ImportedBadgeIcon />}
               </span>
-              {isHost && (
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                {itemBadge(item)}
+                {isHost && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -229,7 +245,8 @@ export default function ItemsPanel({
                 >
                   <RemoveIcon />
                 </button>
-              )}
+                )}
+              </div>
             </div>
           );
         })}

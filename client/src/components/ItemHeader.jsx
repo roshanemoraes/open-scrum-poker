@@ -21,7 +21,7 @@ function ImportedIcon() {
   );
 }
 
-export default function ItemHeader({ item, index, total, isHost, onNext, onManageItems, canNavigate = true }) {
+export default function ItemHeader({ item, index, total, isHost, onNext, onManageItems }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   if (!item) {
@@ -81,8 +81,7 @@ export default function ItemHeader({ item, index, total, isHost, onNext, onManag
       {isHost && (
         <button
           onClick={onNext}
-          disabled={index >= total - 1 || !canNavigate}
-          title={!canNavigate ? 'Set final values for this item before moving on' : undefined}
+          disabled={index >= total - 1}
           className="btn-primary shrink-0 disabled:opacity-30"
         >
           Next <img src={chevronRightLogo} alt="" className="w-5 h-5 shrink-0" />
